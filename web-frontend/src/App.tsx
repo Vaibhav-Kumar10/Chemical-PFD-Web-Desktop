@@ -1,19 +1,43 @@
-import { Route, Routes } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
-import IndexPage from "@/pages/index";
-import DocsPage from "@/pages/docs";
-import PricingPage from "@/pages/pricing";
-import BlogPage from "@/pages/blog";
-import AboutPage from "@/pages/about";
+// Layouts
+import MainLayout from "@/layouts/MainLayout"; 
+
+// Pages
+import Dashboard from "@/pages/Dashboard";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Editor from "@/pages/Editor";
+
+const useAuth = () => {
+  const user = { loggedIn: true}; // Toggle this to false to test login
+  return user.loggedIn;
+};
+
+const ProtectedRoutes = () => {
+  const isAuth = useAuth();
+  return isAuth ? <Outlet /> : <Navigate to="/login" />;
+};
 
 function App() {
   return (
     <Routes>
-      <Route element={<IndexPage />} path="/" />
-      <Route element={<DocsPage />} path="/docs" />
-      <Route element={<PricingPage />} path="/pricing" />
-      <Route element={<BlogPage />} path="/blog" />
-      <Route element={<AboutPage />} path="/about" />
+      {/* Public Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* Protected Routes */}
+      <Route element={<ProtectedRoutes />}>
+        {/* Main Layout */}
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/components" element={<div>Components Page</div>} />
+        </Route>
+
+        {/* Editor Layout */}
+        <Route path="/editor/:projectId" element={<Editor />} />
+      </Route>
     </Routes>
   );
 }
