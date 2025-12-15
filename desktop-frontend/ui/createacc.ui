@@ -234,7 +234,10 @@ QWidget#bgwidget QPushButton#themeToggle:hover {
      <string notr="true"/>
     </property>
     <property name="text">
-     <string>Username</string>
+     <string>Email</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeft</set>
     </property>
    </widget>
 
@@ -251,7 +254,7 @@ QWidget#bgwidget QPushButton#themeToggle:hover {
      <string notr="true"/>
     </property>
     <property name="placeholderText">
-     <string>Username</string>
+     <string>Email</string>
     </property>
    </widget>
 
@@ -269,6 +272,9 @@ QWidget#bgwidget QPushButton#themeToggle:hover {
     </property>
     <property name="text">
      <string>Password</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeft</set>
     </property>
    </widget>
 
@@ -303,6 +309,9 @@ QWidget#bgwidget QPushButton#themeToggle:hover {
     </property>
     <property name="text">
      <string>Confirm Password</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeft</set>
     </property>
    </widget>
 
@@ -374,6 +383,21 @@ QWidget#bgwidget QPushButton#themeToggle:hover {
     </property>
    </widget>
 
+
+    <!-- THEME TOGGLE BUTTON -->
+    <widget class="QPushButton" name="themeToggle">
+     <property name="geometry">
+      <rect>
+       <x>1100</x>
+       <y>40</y>
+       <width>50</width>
+       <height>50</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
 
     <!-- THEME TOGGLE BUTTON -->
     <widget class="QPushButton" name="themeToggle">

@@ -1,5 +1,3 @@
-import sqlite3
-
 from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtWidgets import QDialog
@@ -9,7 +7,7 @@ import src.app_state as app_state
 from src.theme import apply_theme_to_screen, apply_theme_to_all
 from src.navigation import slide_to_index
 from src.toast import show_toast
-
+from src.api_client import login as api_login, register as api_register, ApiError
 
 class WelcomeScreen(QDialog):
     def __init__(self):
@@ -102,7 +100,6 @@ class LoginScreen(QDialog):
             self.update_theme_button()
 
         apply_theme_to_screen(self)
-
         # center once at startup
         self.center_content()
 
@@ -132,6 +129,7 @@ class LoginScreen(QDialog):
     
     def resizeEvent(self, event):
         self.center_content()
+        self.position_theme_toggle()
 
         bg = self.findChild(QtWidgets.QWidget, "bgwidget")
         if bg:
@@ -155,33 +153,44 @@ class LoginScreen(QDialog):
             geo.moveLeft(new_x)
             w.setGeometry(geo)
 
+    def position_theme_toggle(self):
+        btn = getattr(self, "themeToggle", None)
+        if not btn:
+            return
+        geo = btn.geometry()
+        margin_right = 40
+        geo.moveLeft(self.width() - geo.width() - margin_right)
+        btn.setGeometry(geo)
+
+
     def loginfunction(self):
-        user = self.emailfield.text()
+        user = self.emailfield.text().strip()
         password = self.passwordfield.text()
 
-        if len(user) == 0 or len(password) == 0:
+        if not user or not password:
             self.error.setText("Please input all fields.")
             return
 
-        conn = sqlite3.connect("app_users.db")
-        cur = conn.cursor()
-        query = "SELECT password FROM login_info WHERE username = ?"
-        cur.execute(query, (user,))
-        result = cur.fetchone()
-        conn.close()
+        # Clear previous error
+        self.error.setText("")
 
-        if result is None:
-            self.error.setText("Invalid username or password")
+        try:
+            access, refresh = api_login(user, password)
+        except ApiError as e:
+            # Backend / network / invalid creds
+            self.error.setText(str(e))
             return
 
-        result_pass = result[0]
-        if result_pass == password:
-            print("Successfully logged in.")
-            self.error.setText("")
-            show_toast("Logged in successfully!")
-            # later: slide_to_index(3) for a dashboard
-        else:
-            self.error.setText("Invalid username or password")
+        # Store tokens in global app_state
+        app_state.access_token = access
+        app_state.refresh_token = refresh
+        app_state.current_user = user
+
+        print("Successfully logged in via backend.")
+        show_toast("Logged in successfully!")
+
+        # Canvas screen
+        slide_to_index(3, direction=1)
 
 
 class CreateAccScreen(QDialog):
@@ -229,6 +238,7 @@ class CreateAccScreen(QDialog):
     
     def resizeEvent(self, event):
         self.center_content()
+        self.position_theme_toggle()
 
         bg = self.findChild(QtWidgets.QWidget, "bgwidget")
         if bg:
@@ -236,14 +246,16 @@ class CreateAccScreen(QDialog):
         super().resizeEvent(event)
 
     def center_content(self):
-        names = [
+        # 1) Center the main column (title, subtitle, inputs, buttons)
+        center_names = [
             "label", "label_2",
-            "label_3", "emailfield",
-            "label_4", "passwordfield",
-            "label_5", "confirmpasswordfield",
+            "emailfield", "passwordfield", "confirmpasswordfield",
             "error", "signup", "backToLogin"
         ]
-        for name in names:
+
+        base_x = None  # we'll capture the x of emailfield after centering
+
+        for name in center_names:
             w = getattr(self, name, None)
             if not w:
                 continue
@@ -252,13 +264,43 @@ class CreateAccScreen(QDialog):
             geo.moveLeft(new_x)
             w.setGeometry(geo)
 
+            if name == "emailfield":
+                base_x = new_x
+                field_width = geo.width()
+
+        # 2) Left-indent the labels (Username / Password / Confirm Password)
+        if base_x is None:
+            email = getattr(self, "emailfield", None)
+            if email:
+                base_x = email.geometry().x()
+                field_width = email.geometry().width()
+
+        if base_x is not None:
+            for name in ["label_3", "label_4", "label_5"]:
+                lab = getattr(self, name, None)
+                if not lab:
+                    continue
+                geo = lab.geometry()
+                geo.moveLeft(base_x)        # align with field's left start
+                geo.setWidth(field_width)   # same width as field (for consistent wrapping)
+                lab.setGeometry(geo)
+
+    def position_theme_toggle(self):
+        btn = getattr(self, "themeToggle", None)
+        if not btn:
+            return
+        geo = btn.geometry()
+        margin_right = 40
+        geo.moveLeft(self.width() - geo.width() - margin_right)
+        btn.setGeometry(geo)
 
     def signupfunction(self):
-        user = self.emailfield.text()
+        # Treat this as email input
+        email = self.emailfield.text().strip()
         password = self.passwordfield.text()
         confirmpassword = self.confirmpasswordfield.text()
 
-        if len(user) == 0 or len(password) == 0 or len(confirmpassword) == 0:
+        if not email or not password or not confirmpassword:
             self.error.setText("Please fill in all inputs.")
             return
 
@@ -266,23 +308,25 @@ class CreateAccScreen(QDialog):
             self.error.setText("Passwords do not match.")
             return
 
-        conn = sqlite3.connect("app_users.db")
-        cur = conn.cursor()
+        # For backend: use email as both username & email
+        username = email
+
+        # Clear previous error
+        self.error.setText("")
 
         try:
-            cur.execute(
-                "INSERT INTO login_info (username, password) VALUES (?, ?)",
-                (user, password)
-            )
-            conn.commit()
-            conn.close()
+            api_register(username, email, password)
+        except ApiError as e:
+            self.error.setText(str(e))
+            return
 
-            show_toast("Account created successfully!")
-            slide_to_index(0, direction=-1)
+        # Success
+        show_toast("Account created successfully!")
 
-        except sqlite3.IntegrityError:
-            self.error.setText("ERROR: That username is already taken. Please choose another.")
-            conn.close()
-        except Exception as e:
-            self.error.setText(f"An unexpected database error occurred: {e}")
-            conn.close()
+        # Optionally clear inputs
+        self.emailfield.clear()
+        self.passwordfield.clear()
+        self.confirmpasswordfield.clear()
+
+        # Back to welcome
+        slide_to_index(0, direction=-1)
