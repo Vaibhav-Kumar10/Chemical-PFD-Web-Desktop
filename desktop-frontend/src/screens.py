@@ -189,7 +189,7 @@ class LoginScreen(QDialog):
         print("Successfully logged in via backend.")
         show_toast("Logged in successfully!")
 
-        # Canvas screen
+        # Landing screen (index 3)
         slide_to_index(3, direction=1)
 
 

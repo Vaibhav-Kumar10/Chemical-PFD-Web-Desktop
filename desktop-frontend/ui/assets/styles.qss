@@ -1,0 +1,102 @@
+/* Global Styles */
+QWidget {
+    font-family: "Segoe UI", sans-serif;
+}
+
+/* Background */
+QWidget#bgwidget {
+    background-color: #ffffff;
+}
+
+/* Landing Page Styles */
+QLabel#headerLabel {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333333;
+}
+
+QLabel#subtitleLabel {
+    font-size: 16px;
+    color: #666666;
+}
+
+QLabel#sectionHeader {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333333;
+    margin-bottom: 5px;
+}
+
+/* Action Card Styles */
+QFrame#actionCard {
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 8px;
+}
+
+QFrame#actionCard:hover {
+    background-color: #ffffff;
+    border: 1px solid #0366d6;
+    /* Box shadow simulation via border for now, Qt CSS shadow support is limited */
+}
+
+QLabel#cardIcon {
+    font-size: 48px;
+    color: #0366d6;
+}
+
+QLabel#cardTitle {
+    font-size: 16px;
+    font-weight: bold;
+    color: #24292e;
+}
+
+QLabel#cardDesc {
+    font-size: 13px;
+    color: #586069;
+}
+
+/* Recent Project Item Styles */
+QWidget#recentContainer {
+    background-color: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+}
+
+QLabel#recentIcon {
+    font-size: 20px;
+}
+
+QLabel#recentName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #24292e;
+}
+
+QLabel#recentTime {
+    font-size: 12px;
+    color: #586069;
+}
+
+QLabel#recentArrow {
+    font-size: 16px;
+    color: #d1d5da;
+    font-weight: bold;
+}
+
+RecentProjectItem:hover {
+    background-color: #f6f8fa;
+    border-radius: 6px;
+}
+
+RecentProjectItem:hover QLabel#recentName {
+    color: #0366d6;
+}
+
+RecentProjectItem:hover QLabel#recentArrow {
+    color: #0366d6;
+}
+
+QFrame#divider {
+    color: #e1e4e8;
+}
