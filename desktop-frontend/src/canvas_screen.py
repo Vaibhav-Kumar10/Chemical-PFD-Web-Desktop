@@ -84,16 +84,92 @@ class CanvasWidget(QWidget):
         return s.lower().translate(str.maketrans("", "", " ,_/-()"))
 
     def _load_config(self):
+        """Load grips.json into self.component_config with full fuzzy matching support."""
         try:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            json_path = os.path.join(base_dir, "ui", "assets", "grips.json")
+            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            path = os.path.join(base, "ui", "assets", "grips.json")
 
-            with open(json_path, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 for item in data:
                     self.component_config[item["component"]] = item
+
         except Exception as e:
             print("Failed to load grips.json:", e)
+
+    def get_component_config(self, name):
+        """
+        Finds config from grips.json using exact or fuzzy matching.
+        Includes ID_MAP compatibility for legacy naming.
+        """
+        ID_MAP = {
+            'Exchanger905': "905Exchanger",
+            'KettleReboiler907': "907Kettle Reboiler",
+            'OneCellFiredHeaterFurnace': "One Cell Fired Heater",
+            'TwoCellFiredHeaterFurnace': "Two Cell Fired Heater"
+        }
+        name = ID_MAP.get(name, name)
+
+        # Exact match
+        if name in self.component_config:
+            return self.component_config[name]
+
+        # Fuzzy match
+        def clean(s):
+            return s.lower().translate(str.maketrans('', '', ' ,_/-()'))
+
+        target = clean(name)
+
+        for key, cfg in self.component_config.items():
+            if clean(key) == target:
+                return cfg
+
+        return {}
+
+    def find_svg_for_component(self, name):
+        """
+        Fuzzy-matching SVG search inside ui/assets/svg.
+        Supports ID_MAP + case-insensitive + punctuation-insensitive matching.
+        """
+
+        ID_MAP = {
+            'Exchanger905': "905Exchanger",
+            'KettleReboiler907': "907Kettle Reboiler",
+            'OneCellFiredHeaterFurnace': "One Cell Fired Heater, Furnace",
+            'TwoCellFiredHeaterFurnace': "Two Cell Fired Heater, Furnace"
+        }
+        name = ID_MAP.get(name, name)
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        svg_dir = os.path.join(base_dir, "ui", "assets", "svg")
+
+        def clean(s):
+            return s.lower().translate(str.maketrans('', '', ' ,_/-()'))
+
+        target = clean(name)
+
+        if not os.path.exists(svg_dir):
+            print(f"SVG directory missing: {svg_dir}")
+            return None
+
+        for root, _, files in os.walk(svg_dir):
+            for f in files:
+                if not f.lower().endswith(".svg"):
+                    continue
+
+                fname = f[:-4]  # remove .svg
+
+                # Direct match
+                if fname == name:
+                    return os.path.join(root, f)
+
+                # Clean match
+                if clean(fname) == target:
+                    return os.path.join(root, f)
+
+        # No match
+        print(f"No SVG found for: {name}")
+        return None
 
     # ---------------------- DRAG & DROP ----------------------
     def dragEnterEvent(self, event):
@@ -107,6 +183,19 @@ class CanvasWidget(QWidget):
         text = event.mimeData().text()
         self.add_component_label(text, pos)
         event.acceptProposedAction()
+
+    def deselect_all(self):
+        """Deselects all ComponentWidgets and all Connections."""
+        # Deselect components
+        for comp in self.components:
+            comp.set_selected(False)
+
+        # Deselect connections
+        if hasattr(self, "connections"):
+            for conn in self.connections:
+                conn.is_selected = False
+
+        self.update()
 
     # ---------------------- SELECTION + CONNECTION LOGIC ----------------------
     def mousePressEvent(self, event):
