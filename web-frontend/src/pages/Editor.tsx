@@ -13,7 +13,7 @@ import { calculateManualPathsWithBridges } from "@/utils/routing";
 import { useHistory } from "@/hooks/useHistory";
 import { MdZoomIn,MdZoomOut } from "react-icons/md";
 import { TbLayoutSidebarRightExpand,TbLayoutSidebarRightCollapse,TbLayoutSidebarLeftCollapse,TbLayoutSidebarLeftExpand } from "react-icons/tb";
-
+import { MdZoomIn, MdZoomOut, MdCenterFocusWeak } from "react-icons/md";
 interface CanvasState {
   items: CanvasItem[];
   connections: Connection[];
@@ -34,10 +34,53 @@ export default function Editor() {
   const handleZoomOut = () => {
     setStageScale(prev => Math.max(0.1, prev - 0.1)); // Min 10%, decrement 10%
   };
+  const handleCenterToContent = () => {
+  if (droppedItems.length === 0) {
+    // If no items, reset view
+    setStagePos({ x: 0, y: 0 });
+    setStageScale(1);
+    return;
+  }
 
-  const handleZoomReset = () => {
-    setStageScale(1); // Reset to 100%
-  };  
+  // Calculate bounding box of all items
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  droppedItems.forEach(item => {
+    minX = Math.min(minX, item.x);
+    minY = Math.min(minY, item.y);
+    maxX = Math.max(maxX, item.x + item.width);
+    maxY = Math.max(maxY, item.y + item.height);
+  });
+
+  // Add some padding
+  const padding = 100;
+  const contentWidth = maxX - minX + padding * 2;
+  const contentHeight = maxY - minY + padding * 2;
+
+  if (stageRef.current && containerRef.current) {
+    const containerWidth = stageSize.width;
+    const containerHeight = stageSize.height;
+
+    // Calculate scale to fit content
+    const scaleX = containerWidth / contentWidth;
+    const scaleY = containerHeight / contentHeight;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
+
+    // Calculate center position
+    const centerX = minX - padding + contentWidth / 2;
+    const centerY = minY - padding + contentHeight / 2;
+    
+    const targetX = (containerWidth / 2) - (centerX * scale);
+    const targetY = (containerHeight / 2) - (centerY * scale);
+
+    // Animate to position
+    setStageScale(scale);
+    setStagePos({ x: targetX, y: targetY });
+  }
+};
   // History Managed State (Items & Connections)
   const { 
     state: canvasState, 
