@@ -7,7 +7,7 @@ import {
   exportToPDF,
   downloadBlob,
   downloadSVG,
-} from '@/components/Canvas/ExportModal';
+} from '@/utils/exports';
 
 export function useExport() {
   const [isExporting, setIsExporting] = useState(false);

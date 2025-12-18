@@ -10,9 +10,14 @@ import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
 import { ComponentLibrarySidebar, CanvasPropertiesSidebar } from "@/components/Canvas/ComponentLibrarySidebar";
 import { ComponentItem, CanvasItem, Connection, Grip } from "@/components/Canvas/types";
 import { calculateManualPathsWithBridges } from "@/utils/routing";
-import { useHistory } from "@/hooks/useHistory"; 
+import { useHistory } from "@/hooks/useHistory";
 import { TbLayoutSidebarRightExpand, TbLayoutSidebarRightCollapse, TbLayoutSidebarLeftCollapse, TbLayoutSidebarLeftExpand } from "react-icons/tb";
 import { MdZoomIn, MdZoomOut, MdCenterFocusWeak } from "react-icons/md";
+import ExportModal from '@/components/Canvas/ExportModal';
+import { useExport } from '@/hooks/useExport';
+import { ExportOptions } from '@/components/Canvas/types';
+import { FiDownload } from 'react-icons/fi';
+
 interface CanvasState {
   items: CanvasItem[];
   connections: Connection[];
@@ -23,6 +28,21 @@ export default function Editor() {
   const navigate = useNavigate();
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+
+
+  // Export diagram states
+  const [showExportModal, setShowExportModal] = useState(false);
+  const { exportDiagram, isExporting, exportError } = useExport();
+  const handleExport = async (options: ExportOptions) => {
+    await exportDiagram(stageRef.current, options);
+    setShowExportModal(false);
+
+    // Show success toast
+    if (!exportError) {
+      // You can add a toast notification here
+      alert('Export successful!');
+    }
+  };
 
   // --- State ---
   const [components, setComponents] = useState<Record<string, Record<string, ComponentItem>>>({});
@@ -175,10 +195,10 @@ export default function Editor() {
         redo();
         return;
       }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-      e.preventDefault();
-      handleCenterToContent();
-    }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleCenterToContent();
+      }
 
       if (e.key === 'Delete' || e.key === 'Backspace' || e.key.toLowerCase() === 'd') {
         if (selectedConnectionId !== null) {
@@ -492,8 +512,14 @@ export default function Editor() {
 
         <div className="flex gap-2">
           <ThemeSwitch />
-          <Button size="sm" variant="bordered" className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300">
-            Share
+          <Button
+            size="sm"
+            variant="bordered"
+            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+            onPress={() => setShowExportModal(true)}
+            startContent={<FiDownload />}
+          >
+            Export
           </Button>
           <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700">Save Changes</Button>
         </div>
@@ -814,8 +840,13 @@ export default function Editor() {
             />
           )}
         </div>
+              <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+        isExporting={isExporting}
+      />
       </div>
-
     </div>
   );
 }
