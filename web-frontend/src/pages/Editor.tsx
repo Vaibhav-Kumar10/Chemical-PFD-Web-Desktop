@@ -12,6 +12,7 @@ import { ComponentItem, CanvasItem, Connection, Grip } from "@/components/Canvas
 import { calculateManualPathsWithBridges } from "@/utils/routing";
 import { useHistory } from "@/hooks/useHistory";
 import { MdZoomIn,MdZoomOut } from "react-icons/md";
+import { TbLayoutSidebarRightExpand,TbLayoutSidebarRightCollapse,TbLayoutSidebarLeftCollapse,TbLayoutSidebarLeftExpand } from "react-icons/tb";
 
 interface CanvasState {
   items: CanvasItem[];
@@ -21,6 +22,8 @@ interface CanvasState {
 export default function Editor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // --- State ---
   const [components, setComponents] = useState<Record<string, Record<string, ComponentItem>>>({});
@@ -451,16 +454,42 @@ export default function Editor() {
       </div>
 
       {/* Main workspace */}
-    <div className="flex-1 grid grid-cols-[256px_minmax(0,1fr)_288px] overflow-hidden">
-        {/* Left Sidebar - Component Library */}
-        <div className="overflow-hidden">
-        <ComponentLibrarySidebar
-          components={components}
-          onDragStart={handleDragStart}
-          onSearch={setSearchQuery}
-          initialSearchQuery={searchQuery}
-        />
+          <div
+        className="flex-1 grid overflow-hidden transition-all duration-300"
+        style={{
+          gridTemplateColumns: `
+            ${leftCollapsed ? "48px" : "256px"}
+            minmax(0, 1fr)
+            ${rightCollapsed ? "48px" : "288px"}
+          `,
+        }}
+      >
+    {/* Left Sidebar - Component Library */}
+        <div className="relative overflow-hidden border-r border-gray-200 dark:border-gray-800">
+
+  {/* Collapse Button */}
+        <button
+          onClick={() => setLeftCollapsed(v => !v)}
+          className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center
+            rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700
+            hover:bg-gray-100 dark:hover:bg-gray-700"
+          title={leftCollapsed ? "Expand" : "Collapse"}
+        >
+          {!leftCollapsed ? <TbLayoutSidebarLeftCollapse />
+ : <TbLayoutSidebarLeftExpand />
+}
+        </button>
+
+        {!leftCollapsed && (
+          <ComponentLibrarySidebar
+            components={components}
+            onDragStart={handleDragStart}
+            onSearch={setSearchQuery}
+            initialSearchQuery={searchQuery}
+          />
+        )}
       </div>
+
 
 
         {/* Canvas Area - Konva */}
@@ -701,16 +730,31 @@ export default function Editor() {
         </div>
           {/* Right Sidebar - Canvas Properties/Items List */}
         
-        <div className="overflow-hidden hidden lg:block">
-          <CanvasPropertiesSidebar
-            items={droppedItems}
-            selectedItemId={selectedItemId}
-            onSelectItem={handleSelectItem}
-            onDeleteItem={handleDeleteItem}
-            onUpdateItem={handleUpdateItem}
-            showAllItemsByDefault
-          />
-      </div>
+        <div className="relative overflow-hidden border-l border-gray-200 dark:border-gray-800 hidden lg:block">
+
+  {/* Collapse Button */}
+  <button
+    onClick={() => setRightCollapsed(v => !v)}
+    className="absolute top-2 left-2 z-10 w-7 h-7 flex items-center justify-center
+      rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700
+      hover:bg-gray-100 dark:hover:bg-gray-700"
+    title={rightCollapsed ? "Expand" : "Collapse"}
+  >
+    {!rightCollapsed ? <TbLayoutSidebarRightCollapse />
+ : <TbLayoutSidebarRightExpand />}
+  </button>
+
+  {!rightCollapsed && (
+    <CanvasPropertiesSidebar
+      items={droppedItems}
+      selectedItemId={selectedItemId}
+      onSelectItem={handleSelectItem}
+      onDeleteItem={handleDeleteItem}
+      onUpdateItem={handleUpdateItem}
+      showAllItemsByDefault
+    />
+  )}
+</div>
       </div>
       
     </div>
