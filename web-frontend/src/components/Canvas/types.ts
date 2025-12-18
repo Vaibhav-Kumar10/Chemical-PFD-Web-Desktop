@@ -78,6 +78,8 @@ export interface CanvasPropertiesSidebarProps {
   className?: string;
   showAllItemsByDefault?: boolean;
 }
+
+// Export image types 
 export type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
 export type ExportQuality = 'low' | 'medium' | 'high';
 
