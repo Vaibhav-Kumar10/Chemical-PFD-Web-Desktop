@@ -1,3 +1,4 @@
+// Editor.tsx (updated - removed localStorage syncing)
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Stage, Layer, Line } from "react-konva";
@@ -44,43 +45,49 @@ export default function Editor() {
   const navigate = useNavigate();
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [historyInitialState, setHistoryInitialState] =
+    useState<CanvasState | null>(null);
 
-  // Export diagram states
+  // ---------- Build initial state ----------
   const editorStore = useEditorStore();
-
-  useEffect(() => {
+  const initialEditorState = useMemo<CanvasState>(() => {
     if (projectId) {
-      // Load saved state from localStorage or API (optional)
-      const savedState = localStorage.getItem(`editor-${projectId}`);
+      const s = editorStore.getEditorState(projectId);
 
-      if (savedState) {
-        try {
-          const parsedState = JSON.parse(savedState);
-
-          editorStore.hydrateEditor(projectId, parsedState);
-        } catch (e) {
-          console.error("Failed to load saved state:", e);
-          editorStore.initEditor(projectId);
+      return (
+        s ?? {
+          items: [],
+          connections: [],
+          counts: {},
+          sequenceCounter: 0,
         }
-      } else {
-        editorStore.initEditor(projectId);
-      }
+      );
     }
 
-    // Cleanup on unmount
-    return () => {
-      if (projectId) {
-        // Optionally save state before removing
-        // const state = editorStore.getEditorState(projectId);
-        // localStorage.setItem(`editor-${projectId}`, JSON.stringify(state));
-        // editorStore.removeEditor(projectId);
-      }
+    return {
+      items: [],
+      connections: [],
+      counts: {},
+      sequenceCounter: 0,
     };
-  }, [projectId]);
+  }, [projectId, editorStore]);
 
+  // initialize history with a valid initial state
+  const {
+    state: canvasState,
+    set: setCanvasState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useHistory<CanvasState>(initialEditorState);
+  // -------------------------------------------------------------------------
+
+  // Export diagram states
   const currentState = projectId ? editorStore.getEditorState(projectId) : null;
-  const droppedItems = currentState?.items || [];
-  const connections = currentState?.connections || [];
+  const droppedItems = canvasState?.items || [];
+  const connections = canvasState?.connections || [];
 
   const [showExportModal, setShowExportModal] = useState(false);
   const { exportDiagram, isExporting, exportError } = useExport();
@@ -150,27 +157,7 @@ export default function Editor() {
       setStagePos({ x: targetX, y: targetY });
     }
   };
-  // History management
-  const {
-    state: canvasState,
-    set: setCanvasState,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-  } = useHistory<CanvasState>({
-    items: [],
-    connections: [],
-    counts: {},
-    sequenceCounter: 0,
-  });
-
-  // Sync store with history
-  useEffect(() => {
-    if (currentState && projectId) {
-      setCanvasState(currentState);
-    }
-  }, [currentState, projectId]);
+  // History management (now initialized above)
 
   // Use items and connections from history state
 
@@ -178,7 +165,6 @@ export default function Editor() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Connection State
-  // const [connections, setConnections] = useState<Connection[]>([]); // Replaced by history state
   const [selectedConnectionId, setSelectedConnectionId] = useState<
     number | null
   >(null);
@@ -196,28 +182,19 @@ export default function Editor() {
     itemId: number;
     gripIndex: number;
   } | null>(null);
+
   // Canvas Viewport State
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   // Refs
-  const stageRef = useRef<Konva.Stage>(null);
+  const stageRef = useRef<any>(null); // loosened type to avoid runtime null issues
   const containerRef = useRef<HTMLDivElement>(null);
   const dragItemRef = useRef<ComponentItem | null>(null);
 
-  // --- Initialization ---
-  /* 
-  // No longer needed - components loaded from Context
-  useEffect(() => {
-    setComponents(componentsConfig);
-  }, []);
-  */
-
   // --- Helpers ---
 
-  // Precompute final polylines with small "bridge" bumps where
-  // manually drawn lines cross.
   const connectionPaths = useMemo(
     () => calculateManualPathsWithBridges(connections, droppedItems),
     [connections, droppedItems],
@@ -252,9 +229,23 @@ export default function Editor() {
       ) {
         if (selectedConnectionId !== null && projectId) {
           editorStore.removeConnection(projectId, selectedConnectionId);
+
+          // ---------- sync history state after mutation ----------
+          const latest = editorStore.getEditorState(projectId);
+
+          if (latest) setCanvasState(latest);
+          // ----------------------------------------------------------------
+
           setSelectedConnectionId(null);
         } else if (selectedItemId !== null && projectId) {
           editorStore.deleteItem(projectId, selectedItemId);
+
+          // ---------- sync history state after mutation ----------
+          const latest = editorStore.getEditorState(projectId);
+
+          if (latest) setCanvasState(latest);
+          // ----------------------------------------------------------------
+
           setSelectedItemId(null);
         }
       }
@@ -270,6 +261,7 @@ export default function Editor() {
     redo,
     projectId,
     editorStore,
+    setCanvasState,
   ]);
 
   // --- Handlers ---
@@ -292,7 +284,11 @@ export default function Editor() {
         ctx.fillRect(0, 0, 80, 80);
         img.onload = () => {
           ctx.drawImage(img, 0, 0, 80, 80);
-          e.dataTransfer.setDragImage(canvas, 40, 40);
+          try {
+            e.dataTransfer.setDragImage(canvas, 40, 40);
+          } catch {
+            // ignore in unsupported environments
+          }
         };
       }
     }
@@ -303,8 +299,15 @@ export default function Editor() {
     const stage = stageRef.current;
 
     if (dragItemRef.current && stage && projectId) {
-      stage.setPointersPositions(e.nativeEvent);
-      const pointer = stage.getRelativePointerPosition();
+      // Konva Stage#setPointersPositions expects a DOM event
+      // pass nativeEvent (you already did this) — keep it but guard existence
+      try {
+        stage.setPointersPositions(e.nativeEvent);
+      } catch {
+        // fallback: try to compute pointer from event coords
+      }
+
+      const pointer = stage.getRelativePointerPosition?.();
 
       if (pointer) {
         const droppedItem = dragItemRef.current;
@@ -312,6 +315,24 @@ export default function Editor() {
         const img = new Image();
 
         img.src = droppedItem.svg || droppedItem.icon || "";
+
+        const finalizeAdd = (width: number, height: number) => {
+          const newItem = editorStore.addItem(projectId!, droppedItem, {
+            x: pointer.x - width / 2,
+            y: pointer.y - height / 2,
+            width,
+            height,
+            rotation: 0,
+          });
+
+          // ---------- sync history state after mutation ----------
+          const latest = editorStore.getEditorState(projectId!);
+
+          if (latest) setCanvasState(latest);
+          // ----------------------------------------------------------------
+
+          setSelectedItemId(newItem.id);
+        };
 
         img.onload = () => {
           const aspectRatio = img.width / img.height;
@@ -325,27 +346,11 @@ export default function Editor() {
             width = baseSize * aspectRatio;
           }
 
-          const newItem = editorStore.addItem(projectId, droppedItem, {
-            x: pointer.x - width / 2,
-            y: pointer.y - height / 2,
-            width,
-            height,
-            rotation: 0,
-          });
-
-          setSelectedItemId(newItem.id);
+          finalizeAdd(width, height);
         };
 
         img.onerror = () => {
-          const newItem = editorStore.addItem(projectId, droppedItem, {
-            x: pointer.x - 40,
-            y: pointer.y - 40,
-            width: 80,
-            height: 80,
-            rotation: 0,
-          });
-
-          setSelectedItemId(newItem.id);
+          finalizeAdd(80, 80);
         };
       }
       dragItemRef.current = null;
@@ -389,24 +394,43 @@ export default function Editor() {
   };
 
   const handleDeleteItem = (itemId: number) => {
-    if (projectId) {
-      editorStore.deleteItem(projectId, itemId);
-      if (selectedItemId === itemId) {
-        setSelectedItemId(null);
-      }
-    }
+    if (!projectId) return;
+
+    editorStore.deleteItem(projectId, itemId);
+
+    // ---------- sync history state after mutation ----------
+    const latest = editorStore.getEditorState(projectId);
+
+    if (latest) setCanvasState(latest);
+    // ----------------------------------------------------------------
+
+    if (selectedItemId === itemId) setSelectedItemId(null);
   };
 
   const handleUpdateItem = (itemId: number, updates: Partial<CanvasItem>) => {
-    if (projectId) {
-      // Transform Canvas types to store types if needed
-      const storeUpdates: Partial<CanvasItem> = {};
+    if (!projectId) {
+      // update local state so UI can still reflect changes while editing without a project
+      setCanvasState((prev) => {
+        if (!prev) return prev;
 
-      Object.entries(updates).forEach(([key, value]) => {
-        (storeUpdates as any)[key] = value;
+        return {
+          ...prev,
+          items: prev.items.map((it) =>
+            it.id === itemId ? { ...it, ...updates } : it,
+          ),
+        };
       });
-      editorStore.updateItem(projectId, itemId, storeUpdates);
+
+      return;
     }
+
+    editorStore.updateItem(projectId, itemId, updates);
+
+    // ---------- sync history state after mutation ----------
+    const latest = editorStore.getEditorState(projectId);
+
+    if (latest) setCanvasState(latest);
+    // ----------------------------------------------------------------
   };
 
   const handleSelectItem = (itemId: number) => {
@@ -440,6 +464,12 @@ export default function Editor() {
         targetGripIndex: gripIndex,
         waypoints: tempConnection.waypoints,
       });
+
+      // ---------- sync history state after mutation ----------
+      const latest = editorStore.getEditorState(projectId);
+
+      if (latest) setCanvasState(latest);
+      // ----------------------------------------------------------------
 
       setIsDrawingConnection(false);
       setTempConnection(null);
@@ -512,6 +542,28 @@ export default function Editor() {
 
     return () => resizeObserver.disconnect();
   }, []);
+  const log = (...args: any[]) =>
+    console.log("%c[EDITOR]", "color:#22c55e", ...args);
+
+  // ---------- Initialize editor from editor store ----------
+  useEffect(() => {
+    if (!projectId) return;
+
+    log("INITIALIZE EDITOR", {
+      projectId,
+    });
+
+    const existingState = editorStore.getEditorState(projectId);
+
+    if (!existingState) {
+      editorStore.initEditor(projectId);
+    }
+
+    const latest = editorStore.getEditorState(projectId);
+
+    if (latest) setCanvasState(latest);
+  }, [projectId]);
+  // -------------------------------------------------------------------------------
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -768,10 +820,8 @@ export default function Editor() {
                 <ConnectionLine
                   key={connection.id}
                   connection={connection}
-                  items={droppedItems}
-                  // We now pass pathData instead of points for rendering
-                  // points is kept empty [] to satisfy type if needed, or we can just ignore it
                   isSelected={connection.id === selectedConnectionId}
+                  items={droppedItems}
                   pathData={connectionPaths[connection.id]}
                   points={[]}
                   onSelect={() => {
