@@ -48,7 +48,7 @@ export const ComponentLibrarySidebar = ({
   const handleCategorySelect = (category: string) => {
     setActiveCategory(category);
     onCategoryChange?.(category);
-  };
+  }; 
 
   return (
     <div
