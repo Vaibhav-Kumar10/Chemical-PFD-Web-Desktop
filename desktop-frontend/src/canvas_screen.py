@@ -26,10 +26,8 @@ class CanvasWidget(QWidget):
         self.setAutoFillBackground(True)
 
         palette = self.palette()
-        if app_state.current_theme == "dark":
-            palette.setColor(self.backgroundRole(), QtGui.QColor("#0f172a"))
-        else:
-            palette.setColor(self.backgroundRole(), Qt.white)
+        # Always keep canvas white as per requirement
+        palette.setColor(self.backgroundRole(), Qt.white)
         self.setPalette(palette)
 
         self.setAcceptDrops(True)
@@ -51,10 +49,8 @@ class CanvasWidget(QWidget):
 
     def update_canvas_theme(self):
         palette = self.palette()
-        if app_state.current_theme == "dark":
-            palette.setColor(self.backgroundRole(), QtGui.QColor("#0f172a"))
-        else:
-            palette.setColor(self.backgroundRole(), Qt.white)
+        # Always keep canvas white as per requirement
+        palette.setColor(self.backgroundRole(), Qt.white)
 
         self.setPalette(palette)
         self.update()
