@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@heroui/button";
 
 import { SearchIcon } from "@/components/icons";
@@ -72,8 +72,8 @@ export const ComponentLibrarySidebar = ({
         <div className="flex gap-1 overflow-x-auto pb-1">
           <button
             className={`text-xs px-2 py-1 rounded whitespace-nowrap ${activeCategory === "All"
-                ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
               }`}
             onClick={() => handleCategorySelect("All")}
           >
@@ -83,8 +83,8 @@ export const ComponentLibrarySidebar = ({
             <button
               key={category}
               className={`text-xs px-2 py-1 rounded whitespace-nowrap ${activeCategory === category
-                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                 }`}
               onClick={() => handleCategorySelect(category)}
             >
@@ -190,6 +190,10 @@ export const CanvasPropertiesSidebar = ({
   const toggleView = () => {
     setViewMode((prev) => (prev === "list" ? "details" : "list"));
   };
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  useEffect(() => {
+    setIsEditingDescription(false);
+  }, [selectedItemId]);
 
   // Sort items by name for the list view
   const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -234,8 +238,8 @@ export const CanvasPropertiesSidebar = ({
                     <div
                       key={item.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedItemId === item.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                          : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         }`}
                       onClick={() => onSelectItem(item.id)}
                     >
@@ -421,6 +425,43 @@ export const CanvasPropertiesSidebar = ({
                         </div>
                       </div>
                     </div>
+                    {/* Description */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Description
+                        </h5>
+
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          variant={isEditingDescription ? "solid" : "light"}
+                          color="primary"
+                          onPress={() => setIsEditingDescription((prev) => !prev)}
+                        >
+                          {isEditingDescription ? "Save" : "Edit"}
+                        </Button>
+                      </div>
+
+                      <textarea
+                        className={`w-full min-h-[80px] text-sm p-2 border rounded
+      bg-white dark:bg-gray-800
+      border-gray-300 dark:border-gray-600
+      text-gray-800 dark:text-gray-200
+      focus:outline-none focus:ring-2 focus:ring-blue-500
+      ${!isEditingDescription ? "opacity-70 cursor-not-allowed" : ""}
+    `}
+                        placeholder="Enter component description..."
+                        value={selectedItem.description || ""}
+                        disabled={!isEditingDescription}
+                        onChange={(e) =>
+                          onUpdateItem?.(selectedItem.id, {
+                            description: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
 
                     {/* Quick Stats */}
                     <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
