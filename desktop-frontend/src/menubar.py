@@ -74,6 +74,7 @@ class MenuBarManager(QObject):
         delete_action.triggered.connect(self.delete_clicked.emit)
         edit_menu.addAction(delete_action)
 
+        # --- Generate Menu ---
         generate_menu = menubar.addMenu("Generate")
 
         image_action = QAction("Image", self.main_window)
@@ -86,9 +87,10 @@ class MenuBarManager(QObject):
         report_action.triggered.connect(self.generate_report_clicked.emit)
         generate_menu.addAction(report_action)
 
-        # --- Profile Menu ---
+        
         profile_menu = menubar.addMenu("Profile")
         
         logout_action = QAction("Logout", self.main_window)
         logout_action.triggered.connect(self.logout_clicked.emit)
         profile_menu.addAction(logout_action)
+
