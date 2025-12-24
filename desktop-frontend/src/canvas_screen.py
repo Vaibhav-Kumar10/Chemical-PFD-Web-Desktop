@@ -9,6 +9,7 @@ from src.theme import apply_theme_to_screen
 from src.navigation import slide_to_index
 import src.app_state as app_state
 
+
 class CanvasScreen(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -52,7 +53,7 @@ class CanvasScreen(QMainWindow):
         self.menu_manager.save_project_clicked.connect(self.on_save_project)
         self.menu_manager.generate_image_clicked.connect(self.on_generate_image)
         self.menu_manager.generate_report_clicked.connect(lambda: print("Generate Report clicked"))
-        self.menu_manager.add_symbols_clicked.connect(lambda: print("Add Symbols clicked"))
+        self.menu_manager.add_symbols_clicked.connect(self.open_add_symbol_dialog)
 
     def on_new_project(self):
         canvas = CanvasWidget(self)
@@ -61,6 +62,13 @@ class CanvasScreen(QMainWindow):
         sub = self.mdi_area.addSubWindow(canvas)
         sub.setWindowTitle("New Project")
         sub.showMaximized()
+
+    def open_add_symbol_dialog(self):
+        from src.add_symbol_dialog import AddSymbolDialog
+        dlg = AddSymbolDialog(self)
+        # When dialog is accepted, refresh the library
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            self.library.reload_components()
 
     def on_back_home(self):
         slide_to_index(3, direction=-1)

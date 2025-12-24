@@ -4,11 +4,22 @@ import requests
 import src.app_state as app_state
 from src import api_client
 from PyQt5.QtCore import Qt, QMimeData, QSize
-from PyQt5.QtGui import QIcon, QDrag
+from PyQt5.QtGui import QIcon, QDrag, QMovie
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit, 
-    QScrollArea, QLabel, QToolButton, QGridLayout
+    QScrollArea, QLabel, QToolButton, QGridLayout, QLabel, QApplication
 )
+from PyQt5.QtCore import QEvent
+
+class FunctionEvent(QEvent):
+    EVENT_TYPE = QEvent.Type(QEvent.registerEventType())
+
+    def __init__(self, fn):
+        super().__init__(FunctionEvent.EVENT_TYPE)
+        self.fn = fn
+
+    def execute(self):
+        self.fn()
 
 
 class ComponentButton(QToolButton):
@@ -76,6 +87,15 @@ class ComponentLibrary(QWidget):
         self._sync_components_with_backend()
         self._load_components()
         self._populate_icons()
+
+        # Loader animation (hidden by default)
+        self.loader_label = QLabel(self)
+        self.loader_label.setAlignment(Qt.AlignCenter)
+        self.loader_label.setStyleSheet("background: transparent;")
+        self.loader_movie = QMovie("ui/assets/loading.gif")  # put gif in assets
+        self.loader_label.setMovie(self.loader_movie)
+        self.loader_label.setVisible(False)
+
     
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -104,6 +124,24 @@ class ComponentLibrary(QWidget):
         self.scroll_area.setWidget(self.scroll_widget)
         main_layout.addWidget(self.scroll_area)
         
+    def _show_loader(self):
+        # Center the loader overlay
+        size = 80  # overlay size
+        self.loader_label.setGeometry(
+            (self.width() - size) // 2,
+            (self.height() - size) // 2,
+            size, size
+        )
+        self.loader_label.setVisible(True)
+        self.loader_movie.start()
+        self.loader_label.raise_()
+
+        QApplication.processEvents()
+
+    def _hide_loader(self):
+        self.loader_movie.stop()
+        self.loader_label.setVisible(False)
+
     def _load_components(self):
         csv_path = os.path.join("ui", "assets", "Component_Details.csv")
         
@@ -116,104 +154,133 @@ class ComponentLibrary(QWidget):
                 for row in reader:
                     if row['parent'] and row['name']:
                         self.component_data.append({
-                            'parent': row['parent'].strip(),
-                            'name': row['name'].strip(),
-                            'object': row['object'].strip() if row['object'] else ''
+                            "s_no": row.get("s_no", "").strip(),
+                            "parent": row.get("parent", "").strip(),
+                            "name": row.get("name", "").strip(),
+                            "legend": row.get("legend", "").strip(),
+                            "suffix": row.get("suffix", "").strip(),
+                            "object": row.get("object", "").strip(),
+                            "svg": row.get("svg", "").strip(),
+                            "png": row.get("png", "").strip(),
+                            "grips": row.get("grips", "").strip()
                         })
         except Exception as e:
             print(f"Error loading components: {e}")
 
     def _sync_components_with_backend(self):
         """
-        Fetch components from backend and append new ones to local CSV.
-        Also downloads the PNG icon if available.
+        Fetch components from backend, append new ones to CSV,
+        and download PNG/SVG exactly as backend provides.
         """
         try:
-            # 1. Fetch from API
             api_components = api_client.get_components()
             if not api_components:
                 return
 
-            # 2. Read local CSV to find existing s_nos
             csv_path = os.path.join("ui", "assets", "Component_Details.csv")
-            existing_s_nos = set()
+
+            # Get existing S. No list
+            existing = set()
             if os.path.exists(csv_path):
-                with open(csv_path, 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if row.get('s_no'):
-                            existing_s_nos.add(row.get('s_no').strip())
+                with open(csv_path, "r", encoding="utf-8-sig") as f:
+                    for r in csv.DictReader(f):
+                        if r.get("s_no"):
+                            existing.add(r["s_no"].strip())
 
-            # 3. Append new components
             new_rows = []
+
             for comp in api_components:
-                if not isinstance(comp, dict):
-                    continue
-                s_no = str(comp.get('s_no', '')).strip()
-                if not s_no or s_no in existing_s_nos:
+
+                s_no = str(comp.get("s_no", "")).strip()
+                if not s_no or s_no in existing:
                     continue
 
-                # Prepare row
-                row = {
-                    's_no': s_no,
-                    'parent': comp.get('parent', ''),
-                    'name': comp.get('name', ''),
-                    'legend': comp.get('legend', ''),
-                    'suffix': comp.get('suffix', ''),
-                    'object': comp.get('object', ''),
-                    'svg': '', 
-                    'png': '',
-                    'grips': '' 
-                }
-                
-                # Handle Image Download
-                target_folder = self.FOLDER_MAP.get(row['parent'], row['parent'])
-                target_name = row['name']
-                
-                png_dir = os.path.join("ui", "assets", "png", target_folder)
+                parent = comp.get("parent", "").strip()
+                name = comp.get("name", "").strip()
+                obj = comp.get("object", "").strip()
+
+                png_url = comp.get("png_url") or comp.get("png")
+                svg_url = comp.get("svg_url") or comp.get("svg")
+
+                # Prepare folders
+                parent_folder = self.FOLDER_MAP.get(parent, parent)
+                png_dir = os.path.join("ui", "assets", "png", parent_folder)
+                svg_dir = os.path.join("ui", "assets", "svg", parent_folder)
                 os.makedirs(png_dir, exist_ok=True)
-                
-                clean_name = target_name
-                for old, new in self.NAME_CORRECTIONS.items():
-                    clean_name = clean_name.replace(old, new)
-                
-                png_path = os.path.join(png_dir, f"{clean_name}.png")
-                
-                # Download PNG
-                png_url = comp.get('png')
+                os.makedirs(svg_dir, exist_ok=True)
+
+                png_filename = ""
+                svg_filename = ""
+
+                # --- Download PNG ---
                 if png_url:
-                    if not png_url.startswith('http'):
+                    if not png_url.startswith("http"):
                         png_url = f"{app_state.BACKEND_BASE_URL}{png_url}"
+
+                    png_filename = os.path.basename(png_url)
+                    png_path = os.path.join(png_dir, png_filename)
+
                     try:
-                        r = requests.get(png_url, timeout=5)
-                        if r.status_code == 200:
-                            with open(png_path, 'wb') as f:
-                                f.write(r.content)
-                            print(f"Downloaded icon for {target_name}")
+                        res = requests.get(png_url, timeout=5)
+                        if res.status_code == 200:
+                            with open(png_path, "wb") as f:
+                                f.write(res.content)
+                            print(f"[SYNC] PNG saved → {png_path}")
+                        else:
+                            print("[SYNC] PNG download failed:", png_url)
                     except Exception as e:
-                        print(f"Failed to download PNG for {target_name}: {e}")
+                        print("[SYNC ERROR] PNG failed:", e)
 
-                new_rows.append(row)
+                # --- Download SVG ---
+                if svg_url:
+                    if not svg_url.startswith("http"):
+                        svg_url = f"{app_state.BACKEND_BASE_URL}{svg_url}"
 
-            # 4. Write to CSV
+                    svg_filename = os.path.basename(svg_url)
+                    svg_path = os.path.join(svg_dir, svg_filename)
+
+                    try:
+                        res = requests.get(svg_url, timeout=5)
+                        if res.status_code == 200:
+                            with open(svg_path, "wb") as f:
+                                f.write(res.content)
+                            print(f"[SYNC] SVG saved → {svg_path}")
+                    except Exception as e:
+                        print("[SYNC ERROR] SVG failed:", e)
+
+                # CSV row with exact backend filenames
+                new_rows.append({
+                    "s_no": s_no,
+                    "parent": parent,
+                    "name": name,
+                    "legend": comp.get("legend", ""),
+                    "suffix": comp.get("suffix", ""),
+                    "object": obj,
+                    "svg": svg_filename,
+                    "png": png_filename,
+                    "grips": comp.get("grips", "")
+                })
+
+            # Append to CSV
             if new_rows:
-                # Check if file exists to determine if we need header
                 file_exists = os.path.exists(csv_path)
-                
-                with open(csv_path, 'a', newline='', encoding='utf-8') as f:
-                    fieldnames = ['s_no','parent','name','legend','suffix','object','svg','png','grips']
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    
+
+                with open(csv_path, "a", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=[
+                        "s_no", "parent", "name", "legend", "suffix",
+                        "object", "svg", "png", "grips"
+                    ])
+
                     if not file_exists:
                         writer.writeheader()
-                        
-                    for row in new_rows:
-                        writer.writerow(row)
-                
-                print(f"Synced {len(new_rows)} new components from backend.")
+
+                    for r in new_rows:
+                        writer.writerow(r)
+
+                print(f"[SYNC] Added {len(new_rows)} new components.")
 
         except Exception as e:
-            print(f"Component sync failed: {e}")
+            print("[SYNC CRITICAL ERROR]", e)
 
 
     def _populate_icons(self):
@@ -298,6 +365,12 @@ class ComponentLibrary(QWidget):
                     'name': parent_name
                 })
     
+    def event(self, e):
+        if isinstance(e, FunctionEvent):
+            e.execute()
+            return True
+        return super().event(e)
+
     # Mappings for icon path resolution
     FOLDER_MAP = {
         "Furnance and Boilers": "Furnaces and Boilers",
@@ -322,17 +395,59 @@ class ComponentLibrary(QWidget):
     }
 
     def _get_icon_path(self, parent, name, obj=''):
+        """
+        Returns local PNG path.
+        If missing, auto-downloads from backend/media/components/<file>.
+        """
+
+        # 1) Find the CSV entry for this component
+        csv_row = None
+        for c in self.component_data:
+            if c["parent"] == parent and c["name"] == name:
+                csv_row = c
+                break
+
+        backend_png_filename = csv_row.get("png", "") if csv_row else ""
+
+        # 2) Build local folder path
         folder = self.FOLDER_MAP.get(parent, parent)
-        
-        # Check for specific object override first
-        if obj in self.PREFIXED_COMPONENTS:
-            clean_name = self.PREFIXED_COMPONENTS[obj]
-        else:
+        local_dir = os.path.join("ui", "assets", "png", folder)
+        os.makedirs(local_dir, exist_ok=True)
+
+        # 3) If backend provided a filename (new components)
+        if backend_png_filename:
+            local_path = os.path.join(local_dir, backend_png_filename)
+
+            # If already saved locally → use it
+            if os.path.exists(local_path):
+                return local_path
+
+            # Else → download automatically
+            backend_url = f"{app_state.BACKEND_BASE_URL}/media/components/{backend_png_filename}"
+
+            try:
+                print(f"[IMG FETCH] {backend_url}")
+                r = requests.get(backend_url, timeout=5)
+                if r.status_code == 200:
+                    with open(local_path, "wb") as f:
+                        f.write(r.content)
+                    print(f"[IMG FETCH] Saved → {local_path}")
+                    return local_path
+                else:
+                    print("[IMG FETCH ERROR] Failed:", r.status_code)
+            except Exception as e:
+                print("[IMG FETCH ERROR]", e)
+
+        # 4) Fallback: use old cleaned-name system (old CSV entries)
+        clean_name = obj and self.PREFIXED_COMPONENTS.get(obj)
+        if not clean_name:
             clean_name = name
             for old, new in self.NAME_CORRECTIONS.items():
                 clean_name = clean_name.replace(old, new)
-        
-        return os.path.join("ui", "assets", "png", folder, f"{clean_name}.png")
+
+        fallback_path = os.path.join(local_dir, f"{clean_name}.png")
+
+        return fallback_path if os.path.exists(fallback_path) else ""
 
     
     def _filter_icons(self, search_text):
@@ -361,3 +476,27 @@ class ComponentLibrary(QWidget):
             
             category['label'].setVisible(has_match)
             category['grid'].setVisible(has_match)
+
+    def reload_components(self):
+        """
+        Async reload with loading animation
+        """
+        self._show_loader()
+
+        def task():
+            # Background thread work
+            self.component_data.clear()
+            self._sync_components_with_backend()
+            self._load_components()
+
+            # Update UI on main thread
+            QApplication.instance().postEvent(
+                self,
+                FunctionEvent(lambda: (
+                    self._populate_icons(),
+                    self._hide_loader()
+                ))
+            )
+
+        import threading
+        threading.Thread(target=task, daemon=True).start()
