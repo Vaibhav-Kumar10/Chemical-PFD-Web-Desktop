@@ -1,17 +1,26 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Input, Card, CardBody, CardHeader, Divider } from "@heroui/react";
+import { loginUser } from "../api/auth";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Logging in with:", email, password);
-    // TODO: Add API integration here
-    navigate("/dashboard");
+    setIsLoading(true);
+    try {
+      await loginUser(username, password);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login failed", error);
+      alert("Login failed! Please check your credentials.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -21,37 +30,37 @@ export default function Login() {
           <h1 className="text-2xl font-bold">Welcome Back</h1>
           <p className="text-small text-default-500">Log in to access your diagrams</p>
         </CardHeader>
-        
+
         <Divider className="my-2" />
-        
+
         <CardBody>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <Input 
+            <Input
               isRequired
-              label="Email" 
-              placeholder="Enter your email" 
-              type="email" 
+              label="Username"
+              placeholder="Enter your username"
+              type="text"
               variant="bordered"
-              value={email}
-              onValueChange={setEmail}
+              value={username}
+              onValueChange={setUsername}
             />
-            <Input 
+            <Input
               isRequired
-              label="Password" 
-              placeholder="Enter your password" 
-              type="password" 
+              label="Password"
+              placeholder="Enter your password"
+              type="password"
               variant="bordered"
               value={password}
               onValueChange={setPassword}
             />
-            
+
             <div className="flex justify-end">
               <Link to="#" className="text-xs text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
 
-            <Button color="primary" type="submit" className="w-full font-semibold">
+            <Button color="primary" type="submit" className="w-full font-semibold" isLoading={isLoading}>
               Sign In
             </Button>
           </form>
