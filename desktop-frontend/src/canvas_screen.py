@@ -1,6 +1,5 @@
 import os
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtCore import Qt
+from PyQt5 import QtWidgets
 from PyQt5.QtGui import QColor, QBrush, QKeySequence
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QMdiArea, QShortcut, QMdiSubWindow
 
@@ -9,7 +8,7 @@ from src.component_library import ComponentLibrary
 from src.theme import apply_theme_to_screen
 from src.navigation import slide_to_index
 import src.app_state as app_state
-
+from src.theme_manager import theme_manager
 
 class CanvasSubWindow(QMdiSubWindow):
     def closeEvent(self, event):
@@ -56,6 +55,12 @@ class CanvasScreen(QMainWindow):
         
         main_layout.addWidget(self.mdi_area)
 
+        # Connect to theme manager for MDI area updates
+        theme_manager.theme_changed.connect(self.apply_mdi_theme)
+        
+        # Apply initial MDI theme
+        self.apply_mdi_theme(theme_manager.current_theme)
+
         apply_theme_to_screen(self)
         self._register_shortcuts()
 
@@ -75,6 +80,86 @@ class CanvasScreen(QMainWindow):
         self.menu_manager.generate_image_clicked.connect(self.on_generate_image)
         self.menu_manager.generate_report_clicked.connect(self.on_generate_report)
         self.menu_manager.add_symbols_clicked.connect(self.open_add_symbol_dialog)
+
+    def apply_mdi_theme(self, theme):
+        """Apply theme to MDI area title bar and tabs."""
+        print(f"[CANVAS] Applying MDI theme: {theme}")
+        
+        if theme == "dark":
+            mdi_stylesheet = """
+                QMdiArea {
+                    background-color: #0f172a;
+                }
+                
+                /* Tab Bar Styling */
+                QTabBar::tab {
+                    background-color: #1e293b;
+                    color: #cbd5e1;
+                    border: 1px solid #334155;
+                    border-bottom: none;
+                    border-top-left-radius: 6px;
+                    border-top-right-radius: 6px;
+                    padding: 8px 16px;
+                    margin-right: 2px;
+                    font-size: 13px;
+                }
+                
+                QTabBar::tab:selected {
+                    background-color: #3b82f6;
+                    color: #ffffff;
+                    border-color: #3b82f6;
+                    font-weight: bold;
+                }
+                
+                QTabBar::tab:hover:!selected {
+                    background-color: #334155;
+                    color: #f1f5f9;
+                }
+                
+                /* Subwindow styling */
+                QMdiSubWindow {
+                    background-color: #0f172a;
+                }
+            """
+        else:  # light theme
+            mdi_stylesheet = """
+                QMdiArea {
+                    background-color: #fffaf5;
+                }
+                
+                /* Tab Bar Styling */
+                QTabBar::tab {
+                    background-color: #f4e8dc;
+                    color: #3A2A20;
+                    border: 1px solid #C97B5A;
+                    border-bottom: none;
+                    border-top-left-radius: 6px;
+                    border-top-right-radius: 6px;
+                    padding: 8px 16px;
+                    margin-right: 2px;
+                    font-size: 13px;
+                }
+                
+                QTabBar::tab:selected {
+                    background-color: #C97B5A;
+                    color: #ffffff;
+                    border-color: #C97B5A;
+                    font-weight: bold;
+                }
+                
+                QTabBar::tab:hover:!selected {
+                    background-color: #ffffff;
+                    color: #3A2A20;
+                }
+                
+                /* Subwindow styling */
+                QMdiSubWindow {
+                    background-color: #fffaf5;
+                }
+            """
+        
+        self.mdi_area.setStyleSheet(mdi_stylesheet)
+        # print(f"[CANVAS] MDI theme applied: {theme}")
 
     def on_new_project(self):
         canvas = CanvasWidget(self)
@@ -265,3 +350,13 @@ class CanvasScreen(QMainWindow):
         app_state.refresh_token = None
         app_state.current_user = None
         slide_to_index(0, direction=-1)
+
+    def open_add_symbol_dialog(self):
+        from src.add_symbol_dialog import AddSymbolDialog
+        
+        # CHANGED: Explicitly pass the current theme from the library
+        current_theme = self.library.current_library_theme
+        
+        dlg = AddSymbolDialog(self, theme=current_theme)
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            self.library.reload_components()

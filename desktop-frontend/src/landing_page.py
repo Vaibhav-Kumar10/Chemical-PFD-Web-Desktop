@@ -2,10 +2,11 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QSpacerItem, QSizePolicy
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QEvent
 from PyQt5.QtGui import QFont
 
 from src.theme import apply_theme_to_screen
+from src.theme_manager import theme_manager
 from src.navigation import slide_to_index
 
 
@@ -213,13 +214,25 @@ class LandingPage(QWidget):
         self.content_layout.addLayout(h)
         self.content_layout.addStretch()
 
-        # Apply theme
-        apply_theme_to_screen(self)
+        # Connect to theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
+        
+        # Apply initial theme
+        self.on_theme_changed(theme_manager.current_theme)
 
         # Logout
         self.logout_btn.clicked.connect(self.on_logout_clicked)
 
-    # LOGOUT LOGIC
+    def on_theme_changed(self, theme):
+        """Called when theme changes from theme manager."""
+        apply_theme_to_screen(self, theme)
+
+    def changeEvent(self, event):
+        """Detect system theme changes."""
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            theme_manager.on_system_theme_changed()
+        super().changeEvent(event)
+
     def on_logout_clicked(self):
         import src.app_state as app_state
 
@@ -229,5 +242,3 @@ class LandingPage(QWidget):
 
         print("Logged out. Tokens cleared.")
         slide_to_index(0, direction=-1)
-
-

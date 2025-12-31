@@ -10,7 +10,7 @@ import src.app_state as app_state
 from src.grip_editor_dialog import GripEditorDialog
 
 class AddSymbolDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme="light"):
         super().__init__(parent)
 
         self.setWindowTitle("Add New Symbol")
@@ -19,47 +19,50 @@ class AddSymbolDialog(QDialog):
         self.setMinimumHeight(800)
 
         # Modern rounded popup
-        self.setStyleSheet("""
-            QDialog {
-                border-radius: 16px;
-                background-color: #ffffff;
-            }
-            QLabel {
-                font-size: 14px;
-                font-weight: 500;
-            }
-            QLineEdit, QTextEdit {
-                border: 1px solid #ccc;
-                border-radius: 8px;
-                padding: 6px;
-                font-size: 14px;
-            }
-            QPushButton {
-                padding: 8px 18px;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 600;
-            }
-            QPushButton#submitBtn {
-                background-color: #3b82f6;
-                color: white;
-            }
-            QPushButton#submitBtn:hover {
-                background-color: #2563eb;
-            }
-            QPushButton#cancelBtn {
-                background-color: #e5e7eb;
-            }
-            QPushButton#fileBtn {
-                background-color: #d1d5db;
-                padding: 6px 12px;
-                border-radius: 6px;
-                font-size: 13px;
-            }
-        """)
+        # self.setStyleSheet("""
+        #     QDialog {
+        #         border-radius: 16px;
+        #         background-color: #ffffff;
+        #     }
+        #     QLabel {
+        #         font-size: 14px;
+        #         font-weight: 500;
+        #     }
+        #     QLineEdit, QTextEdit {
+        #         border: 1px solid #ccc;
+        #         border-radius: 8px;
+        #         padding: 6px;
+        #         font-size: 14px;
+        #     }
+        #     QPushButton {
+        #         padding: 8px 18px;
+        #         border-radius: 8px;
+        #         font-size: 14px;
+        #         font-weight: 600;
+        #     }
+        #     QPushButton#submitBtn {
+        #         background-color: #3b82f6;
+        #         color: white;
+        #     }
+        #     QPushButton#submitBtn:hover {
+        #         background-color: #2563eb;
+        #     }
+        #     QPushButton#cancelBtn {
+        #         background-color: #e5e7eb;
+        #     }
+        #     QPushButton#fileBtn {
+        #         background-color: #d1d5db;
+        #         padding: 6px 12px;
+        #         border-radius: 6px;
+        #         font-size: 13px;
+        #     }
+        # """)
 
         self.svg_path = None
         self.png_path = None
+
+        # Apply the passed theme immediately
+        self.apply_theme(theme)
 
         outer_layout = QVBoxLayout(self)
 
@@ -68,6 +71,7 @@ class AddSymbolDialog(QDialog):
         outer_layout.addWidget(scroll)
 
         container = QtWidgets.QWidget()
+        container.setObjectName("container")
         layout = QVBoxLayout(container)
         layout.setSpacing(14)
 
@@ -128,6 +132,99 @@ class AddSymbolDialog(QDialog):
         btn_row.addWidget(self.submit_btn)
 
         layout.addLayout(btn_row)
+
+    def apply_theme(self, theme):
+        """
+        Applies styles based on the ComponentLibrary color scheme.
+        """
+        if theme == "dark":
+            bg_main       = "#0f172a" 
+            text_main     = "#f8fafc"
+            
+            input_bg      = "#1e293b"
+            input_border  = "#3b82f6"
+            input_text    = "#ffffff"
+            
+            btn_bg        = "#1e293b"
+            btn_border    = "#334155"
+            btn_text      = "#f8fafc"
+            btn_hover     = "#334155"
+            
+            submit_bg     = "#3b82f6"
+            submit_text   = "#ffffff"
+            submit_hover  = "#2563eb"
+
+        else:
+            bg_main       = "#fffaf5"
+            text_main     = "#3A2A20"
+            
+            input_bg      = "#FFFFFF"
+            input_border  = "#C97B5A"
+            input_text    = "#3A2A20"
+
+            btn_bg        = "#f4e8dc"
+            btn_border    = "#C97B5A"
+            btn_text      = "#3A2A20"
+            btn_hover     = "#ffffff"
+            
+            submit_bg     = "#C97B5A"
+            submit_text   = "#ffffff"
+            submit_hover  = "#B06345"
+
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {bg_main};
+                color: {text_main};
+            }}
+            QWidget {{
+                background-color: {bg_main};
+                color: {text_main};
+            }}
+            QLabel {{
+                color: {text_main};
+                font-size: 14px;
+                font-weight: 500;
+            }}
+            
+            QLineEdit, QTextEdit {{
+                background-color: {input_bg};
+                color: {input_text};
+                border: 1px solid {input_border};
+                border-radius: 8px;
+                padding: 6px;
+                font-size: 14px;
+            }}
+            QLineEdit:focus, QTextEdit:focus {{
+                border: 2px solid {input_border};
+            }}
+
+            QPushButton {{
+                background-color: {btn_bg};
+                color: {btn_text};
+                border: 1px solid {btn_border};
+                padding: 8px 18px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {btn_hover};
+            }}
+
+            QPushButton#submitBtn {{
+                background-color: {submit_bg};
+                color: {submit_text};
+                border: none;
+            }}
+            QPushButton#submitBtn:hover {{
+                background-color: {submit_hover};
+            }}
+            
+            QScrollArea {{
+                background-color: {bg_main};
+                border: none;
+            }}
+        """)
 
     def _line(self, layout, placeholder):
         lbl = QLabel(placeholder)

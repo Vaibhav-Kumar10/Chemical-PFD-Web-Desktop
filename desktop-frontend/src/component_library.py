@@ -3,14 +3,14 @@ import csv
 import json
 import requests
 import src.app_state as app_state
+from src.theme_manager import theme_manager
 from src import api_client
-from PyQt5.QtCore import Qt, QMimeData, QSize, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt5.QtGui import QIcon, QDrag, QMovie
+from PyQt5.QtCore import Qt, QMimeData, QSize, QTimer, QPropertyAnimation, QEasingCurve, QEvent, pyqtSignal
+from PyQt5.QtGui import QIcon, QDrag, QMovie, QPixmap, QPalette
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit, 
-    QScrollArea, QLabel, QToolButton, QGridLayout, QLabel, QApplication, QGraphicsOpacityEffect
+    QScrollArea, QLabel, QToolButton, QGridLayout, QLabel, QApplication, QGraphicsOpacityEffect, QHBoxLayout
 )
-from PyQt5.QtCore import QEvent
 
 class FunctionEvent(QEvent):
     EVENT_TYPE = QEvent.Type(QEvent.registerEventType())
@@ -75,7 +75,15 @@ class ComponentButton(QToolButton):
         self.component_data = component_data
         
         if os.path.exists(icon_path):
-            self.setIcon(QIcon(icon_path))
+            pix = QPixmap(icon_path)
+            pix.setDevicePixelRatio(2.0)
+            # print(icon_path, pix.width(), pix.height())
+            pix = pix.scaled(
+                128, 128,                     # upscale
+                Qt.KeepAspectRatio,
+                Qt.FastTransformation
+            )
+            self.setIcon(QIcon(pix))
             self.setIconSize(QSize(42, 42))
 
         # BADGE for added components
@@ -97,18 +105,18 @@ class ComponentButton(QToolButton):
         
         self.setToolTip(component_data['name'])
         self.setFixedSize(56, 56)
-        self.setStyleSheet("""
-            QToolButton {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                background-color: white;
-                padding: 2px;
-            }
-            QToolButton:hover {
-                border: 2px solid #0078d7;
-                background-color: #e5f3ff;
-            }
-        """)
+        # self.setStyleSheet("""
+        #     QToolButton {
+        #         border: 1px solid #ccc;
+        #         border-radius: 4px;
+        #         background-color: white;
+        #         padding: 2px;
+        #     }
+        #     QToolButton:hover {
+        #         border: 2px solid #0078d7;
+        #         background-color: #e5f3ff;
+        #     }
+        # """)
         
         self.dragStartPosition = None
     
@@ -149,6 +157,7 @@ class ComponentButton(QToolButton):
 class ComponentLibrary(QWidget):
     def __init__(self, parent=None):
         super(ComponentLibrary, self).__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.new_snos = set()  # holds S.No added in last sync
         
         self.setMinimumWidth(260)
@@ -157,8 +166,15 @@ class ComponentLibrary(QWidget):
         self.component_data = []
         self.icon_buttons = []
         self.category_widgets = []
+
+        # Connect to global theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
+        
+        # Get initial theme from theme manager
+        self.current_library_theme = theme_manager.current_theme
         
         self._setup_ui()
+        self.apply_theme(self.current_library_theme)
         self._sync_components_with_backend()
         self._load_components()
         self._populate_icons()
@@ -177,11 +193,27 @@ class ComponentLibrary(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(5)
+
+        # --- Header with Toggle Button ---
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 5)
         
         title = QLabel("Components")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-bottom: 5px;")
-        title.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(title)
+        title.setStyleSheet("font-weight: bold; font-size: 14px; border: none;")
+        
+        # Theme Toggle Button
+        self.theme_toggle = QToolButton()
+        self.theme_toggle.setObjectName("themeToggle")
+        self.theme_toggle.setCursor(Qt.PointingHandCursor)
+        self.theme_toggle.setStyleSheet("border: none; background: transparent; font-size: 14px;")
+        self.theme_toggle.clicked.connect(self.toggle_theme)
+        
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        header_layout.addWidget(self.theme_toggle)
+        
+        main_layout.addWidget(header_widget)
         
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search components...")
@@ -190,9 +222,10 @@ class ComponentLibrary(QWidget):
         
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         self.scroll_widget = QWidget()
+        self.scroll_widget.setObjectName("scrollWidget")
         self.scroll_layout = QVBoxLayout(self.scroll_widget)
         self.scroll_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.scroll_layout.setSpacing(10)
@@ -408,14 +441,15 @@ class ComponentLibrary(QWidget):
         
         for parent_name in sorted(grouped.keys()):
             category_label = QLabel(parent_name)
-            category_label.setStyleSheet("""
-                QLabel {
-                    font-size: 8pt;
-                    padding: 5px;
-                    background-color: #f0f0f0;
-                    border-radius: 3px;
-                }
-            """)
+            category_label.setObjectName("categoryLabel")
+            # category_label.setStyleSheet("""
+            #     QLabel {
+            #         font-size: 8pt;
+            #         padding: 5px;
+            #         background-color: #f0f0f0;
+            #         border-radius: 3px;
+            #     }
+            # """)
             
             grid_widget = QWidget()
             grid_layout = QGridLayout(grid_widget)
@@ -589,3 +623,221 @@ class ComponentLibrary(QWidget):
 
         import threading
         threading.Thread(target=task, daemon=True).start()
+
+    def toggle_theme(self):
+        """Toggle theme via global theme manager."""
+        theme_manager.toggle_theme()
+
+    def on_theme_changed(self, theme):
+        """Called when theme changes from theme manager."""
+        self.current_library_theme = theme
+        self.apply_theme(theme)
+
+    # Update apply_theme to NOT emit signal (theme manager handles it):
+    def apply_theme(self, theme):
+        """
+        Apply theme to component library only.
+        DO NOT emit signal - theme manager handles coordination.
+        """
+        if theme == "dark":
+            # --- DARK THEME ---
+            bg_main       = "#0f172a"  
+            text_main     = "#f8fafc"
+            
+            # Input
+            input_bg      = "#1e293b"
+            input_border  = "#3b82f6"
+            input_text    = "#ffffff"
+            
+            # Category Label
+            cat_bg        = "#1e293b"
+            cat_text      = "#60a5fa"
+            cat_border    = "1px solid #334155"
+            
+            # Component Buttons
+            btn_bg        = "#3a5073"
+            btn_border    = "#334155"
+            btn_hover_bg  = "#334155"
+            btn_hover_border = "#60a5fa"
+            
+            # Scrollbar
+            scroll_track  = "#0f172a"
+            scroll_handle = "#334155"
+            scroll_hover  = "#475569"
+            
+            toggle_icon_path = os.path.join("ui", "res", "sun.png")
+
+        else:
+            # --- LIGHT THEME ---
+            bg_main       = "#fffaf5"  
+            text_main     = "#3A2A20"
+            
+            # Input
+            input_bg      = "#FFFFFF"
+            input_border  = "#C97B5A"
+            input_text    = "#3A2A20"
+
+            # Category Label
+            cat_bg        = "#faeadd"
+            cat_text      = "#8B4731"
+            cat_border    = "none"
+            
+            # Component Buttons
+            btn_bg        = "#f4e8dc" 
+            btn_border    = "#C97B5A"
+            btn_hover_bg  = "#FFFFFF"
+            btn_hover_border = "#B06345"
+            
+            # Scrollbar
+            scroll_track  = "#fffaf5"
+            scroll_handle = "#E0C0A8"
+            scroll_hover  = "#C97B5A"
+            
+            toggle_icon_path = os.path.join("ui", "res", "moon.png")
+
+        # Icon Logic
+        if os.path.exists(toggle_icon_path):
+            self.theme_toggle.setIcon(QIcon(toggle_icon_path))
+            self.theme_toggle.setText("") 
+        else:
+            self.theme_toggle.setIcon(QIcon())
+            self.theme_toggle.setText("☼" if theme == "dark" else "☾")
+
+        # Apply CSS (same as before)
+        self.setStyleSheet(f"""
+            ComponentLibrary {{
+                background-color: {bg_main};
+            }}
+            QLabel {{
+                color: {text_main};
+                font-family: "Segoe UI";
+            }}
+            
+            /* ... rest of your stylesheet ... */
+            
+            QLineEdit {{
+                background-color: {input_bg};
+                color: {input_text};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {input_border};
+            }}
+            
+            QScrollArea {{
+                border: none;
+                background-color: {bg_main};
+            }}
+            QWidget#scrollWidget {{
+                background-color: {bg_main};
+            }}
+            
+            QScrollBar:vertical {{
+                border: none;
+                background: {scroll_track};
+                width: 12px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {scroll_handle};
+                min-height: 20px;
+                border-radius: 6px;
+                margin: 2px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {scroll_hover};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: none;
+            }}
+
+            QScrollBar:horizontal {{
+                border: none;
+                background: {scroll_track};
+                height: 12px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {scroll_handle};
+                min-width: 20px;
+                border-radius: 6px;
+                margin: 2px;
+            }}
+            QScrollBar::handle:horizontal:hover {{
+                background: {scroll_hover};
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                width: 0px;
+            }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background: none;
+            }}
+            
+            QLabel#categoryLabel {{
+                background-color: {cat_bg};
+                color: {cat_text};
+                border: {cat_border};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                margin-top: 10px;
+                margin-bottom: 2px;
+            }}
+            
+            QToolButton {{
+                background-color: {btn_bg};
+                border: 1px solid {btn_border};
+                border-radius: 6px;
+                padding: 4px;
+            }}
+            QToolButton:hover {{
+                background-color: {btn_hover_bg};
+                border: 1px solid {btn_hover_border};
+            }}
+            
+            ComponentLibrary > QLabel {{
+                font-size: 16px;
+                font-weight: bold;
+                color: {text_main}; 
+                padding-bottom: 5px;
+            }}
+
+            QToolButton#themeToggle {{
+                font-size: 16px;
+                border: none;
+                background: transparent;
+                color: {text_main};
+            }}
+            QToolButton#themeToggle:hover {{
+                background: rgba(128, 128, 128, 0.1);
+                border-radius: 12px;
+            }}
+            
+            QToolTip {{
+                color: {text_main};
+                background-color: {bg_main};
+                border: 1px solid {input_border};
+            }}
+        """)
+
+        # Force Style Recompute
+        self.style().unpolish(self)
+        self.style().polish(self)
+        
+        for child in self.findChildren(QWidget):
+            child.style().unpolish(child)
+            child.style().polish(child)
+
+    def changeEvent(self, event):
+        """Detect system theme changes."""
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            theme_manager.on_system_theme_changed()
+        super().changeEvent(event)

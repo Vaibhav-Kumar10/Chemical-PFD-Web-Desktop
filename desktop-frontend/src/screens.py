@@ -1,13 +1,16 @@
 from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtWidgets import QDialog
+from PyQt5.QtCore import QEvent
 import os
 
 import src.app_state as app_state
-from src.theme import apply_theme_to_screen, apply_theme_to_all
+from src.theme import apply_theme_to_screen
+from src.theme_manager import theme_manager
 from src.navigation import slide_to_index
 from src.toast import show_toast
 from src.api_client import login as api_login, register as api_register, ApiError
+
 
 class WelcomeScreen(QDialog):
     def __init__(self):
@@ -19,42 +22,41 @@ class WelcomeScreen(QDialog):
 
         if hasattr(self, "themeToggle"):
             self.themeToggle.clicked.connect(self.toggle_theme)
-            self.update_theme_button()
-
-        apply_theme_to_screen(self)
+        
+        # Connect to theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
+        
+        # Apply initial theme
+        self.on_theme_changed(theme_manager.current_theme)
         self.center_content()
 
     def gotologin(self):
-        import src.app_state as app_state
-        
-        # Reset tokens & fields before entering LoginScreen
         login_screen = app_state.screens["login"]
         login_screen.reset_state()
-
         slide_to_index(1, direction=1)
 
     def gotocreate(self):
-        import src.app_state as app_state
-        
         create_screen = app_state.screens["create"]
-        create_screen.reset_state()      # clear form + tokens
-
+        create_screen.reset_state()
         slide_to_index(2, direction=1)
 
     def toggle_theme(self):
-        new_theme = "dark" if app_state.current_theme == "light" else "light"
-        apply_theme_to_all(new_theme)
-        self.update_theme_button()
+        """Toggle theme via theme manager."""
+        theme_manager.toggle_theme()
+
+    def on_theme_changed(self, theme):
+        """Called when theme changes from theme manager."""
+        apply_theme_to_screen(self, theme)
+        self.update_theme_button(theme)
         self.center_content()
 
-    def update_theme_button(self):
+    def update_theme_button(self, theme):
         if not hasattr(self, "themeToggle"):
             return
-        if app_state.current_theme == "light":
-            # Current is light -> Show Moon (to switch to dark)
+            
+        if theme == "light":
             icon_path = os.path.join("ui", "res", "moon.png")
         else:
-            # Current is dark -> Show Sun (to switch to light)
             icon_path = os.path.join("ui", "res", "sun.png")
             
         if os.path.exists(icon_path):
@@ -62,8 +64,13 @@ class WelcomeScreen(QDialog):
             self.themeToggle.setIconSize(QtCore.QSize(32, 32))
             self.themeToggle.setText("")
         else:
-            # Fallback if icon missing
-            self.themeToggle.setText("Dark mode" if app_state.current_theme == "light" else "Light mode")
+            self.themeToggle.setText("Dark mode" if theme == "light" else "Light mode")
+
+    def changeEvent(self, event):
+        """Detect system theme changes."""
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            theme_manager.on_system_theme_changed()
+        super().changeEvent(event)
 
     def resizeEvent(self, event):
         self.center_content()
@@ -84,7 +91,7 @@ class WelcomeScreen(QDialog):
             new_x = (self.width() - geo.width()) // 2
             geo.moveLeft(new_x)
             w.setGeometry(geo)
-    # keep toggle at top-right with a margin
+
     def position_theme_toggle(self):
         btn = getattr(self, "themeToggle", None)
         if not btn:
@@ -93,6 +100,7 @@ class WelcomeScreen(QDialog):
         margin_right = 40
         geo.moveLeft(self.width() - geo.width() - margin_right)
         btn.setGeometry(geo)
+
 
 class LoginScreen(QDialog):
     def __init__(self):
@@ -108,25 +116,32 @@ class LoginScreen(QDialog):
 
         if hasattr(self, "themeToggle"):
             self.themeToggle.clicked.connect(self.toggle_theme)
-            self.update_theme_button()
-
-        apply_theme_to_screen(self)
-        # center once at startup
+        
+        # Connect to theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
+        
+        # Apply initial theme
+        self.on_theme_changed(theme_manager.current_theme)
         self.center_content()
 
     def gotowelcome(self):
         slide_to_index(0, direction=-1)
 
     def toggle_theme(self):
-        new_theme = "dark" if app_state.current_theme == "light" else "light"
-        apply_theme_to_all(new_theme)
-        self.update_theme_button()
+        """Toggle theme via theme manager."""
+        theme_manager.toggle_theme()
+
+    def on_theme_changed(self, theme):
+        """Called when theme changes from theme manager."""
+        apply_theme_to_screen(self, theme)
+        self.update_theme_button(theme)
         self.center_content()
 
-    def update_theme_button(self):
+    def update_theme_button(self, theme):
         if not hasattr(self, "themeToggle"):
             return
-        if app_state.current_theme == "light":
+            
+        if theme == "light":
             icon_path = os.path.join("ui", "res", "moon.png")
         else:
             icon_path = os.path.join("ui", "res", "sun.png")
@@ -136,7 +151,13 @@ class LoginScreen(QDialog):
             self.themeToggle.setIconSize(QtCore.QSize(32, 32))
             self.themeToggle.setText("")
         else:
-            self.themeToggle.setText("Dark mode" if app_state.current_theme == "light" else "Light mode")
+            self.themeToggle.setText("Dark mode" if theme == "light" else "Light mode")
+
+    def changeEvent(self, event):
+        """Detect system theme changes."""
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            theme_manager.on_system_theme_changed()
+        super().changeEvent(event)
     
     def resizeEvent(self, event):
         self.center_content()
@@ -148,7 +169,6 @@ class LoginScreen(QDialog):
         super().resizeEvent(event)
 
     def center_content(self):
-        # widgets we want in the vertical column
         names = [
             "label", "label_2",
             "label_3", "emailfield",
@@ -174,16 +194,9 @@ class LoginScreen(QDialog):
         btn.setGeometry(geo)
 
     def reset_state(self):
-        import src.app_state as app_state
-        app_state.access_token = None
-        app_state.refresh_token = None
-        app_state.current_user = None
-
         self.emailfield.clear()
         self.passwordfield.clear()
         self.error.setText("")
-
-
 
     def loginfunction(self):
         user = self.emailfield.text().strip()
@@ -193,25 +206,20 @@ class LoginScreen(QDialog):
             self.error.setText("Please input all fields.")
             return
 
-        # Clear previous error
         self.error.setText("")
 
         try:
             access, refresh = api_login(user, password)
         except ApiError as e:
-            # Backend / network / invalid creds
             self.error.setText(str(e))
             return
 
-        # Store tokens in global app_state
         app_state.access_token = access
         app_state.refresh_token = refresh
         app_state.current_user = user
 
         print("Successfully logged in via backend.")
         show_toast("Logged in successfully!")
-
-        # Landing screen (index 3)
         slide_to_index(3, direction=1)
 
 
@@ -223,36 +231,39 @@ class CreateAccScreen(QDialog):
         self.passwordfield.setEchoMode(QtWidgets.QLineEdit.Password)
         self.confirmpasswordfield.setEchoMode(QtWidgets.QLineEdit.Password)
         self.signup.clicked.connect(self.signupfunction)
-
         self.error.setWordWrap(True)
         self.backToLogin.clicked.connect(self.gotologin)
 
         if hasattr(self, "themeToggle"):
             self.themeToggle.clicked.connect(self.toggle_theme)
-            self.update_theme_button()
-
-        apply_theme_to_screen(self)
+        
+        # Connect to theme manager
+        theme_manager.theme_changed.connect(self.on_theme_changed)
+        
+        # Apply initial theme
+        self.on_theme_changed(theme_manager.current_theme)
         self.center_content()
 
     def gotologin(self):
-        import src.app_state as app_state
-        
-        # Reset tokens & fields before entering LoginScreen
         login_screen = app_state.screens["login"]
         login_screen.reset_state()
-
         slide_to_index(1, direction=1)
 
     def toggle_theme(self):
-        new_theme = "dark" if app_state.current_theme == "light" else "light"
-        apply_theme_to_all(new_theme)
-        self.update_theme_button()
+        """Toggle theme via theme manager."""
+        theme_manager.toggle_theme()
+
+    def on_theme_changed(self, theme):
+        """Called when theme changes from theme manager."""
+        apply_theme_to_screen(self, theme)
+        self.update_theme_button(theme)
         self.center_content()
 
-    def update_theme_button(self):
+    def update_theme_button(self, theme):
         if not hasattr(self, "themeToggle"):
             return
-        if app_state.current_theme == "light":
+            
+        if theme == "light":
             icon_path = os.path.join("ui", "res", "moon.png")
         else:
             icon_path = os.path.join("ui", "res", "sun.png")
@@ -262,7 +273,13 @@ class CreateAccScreen(QDialog):
             self.themeToggle.setIconSize(QtCore.QSize(32, 32))
             self.themeToggle.setText("")
         else:
-            self.themeToggle.setText("Dark mode" if app_state.current_theme == "light" else "Light mode")
+            self.themeToggle.setText("Dark mode" if theme == "light" else "Light mode")
+
+    def changeEvent(self, event):
+        """Detect system theme changes."""
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            theme_manager.on_system_theme_changed()
+        super().changeEvent(event)
     
     def resizeEvent(self, event):
         self.center_content()
@@ -274,14 +291,13 @@ class CreateAccScreen(QDialog):
         super().resizeEvent(event)
 
     def center_content(self):
-        # 1) Center the main column (title, subtitle, inputs, buttons)
         center_names = [
             "label", "label_2",
             "emailfield", "passwordfield", "confirmpasswordfield",
             "error", "signup", "backToLogin"
         ]
 
-        base_x = None  # we'll capture the x of emailfield after centering
+        base_x = None
 
         for name in center_names:
             w = getattr(self, name, None)
@@ -296,7 +312,6 @@ class CreateAccScreen(QDialog):
                 base_x = new_x
                 field_width = geo.width()
 
-        # 2) Left-indent the labels (Username / Password / Confirm Password)
         if base_x is None:
             email = getattr(self, "emailfield", None)
             if email:
@@ -309,8 +324,8 @@ class CreateAccScreen(QDialog):
                 if not lab:
                     continue
                 geo = lab.geometry()
-                geo.moveLeft(base_x)        # align with field's left start
-                geo.setWidth(field_width)   # same width as field (for consistent wrapping)
+                geo.moveLeft(base_x)
+                geo.setWidth(field_width)
                 lab.setGeometry(geo)
 
     def position_theme_toggle(self):
@@ -323,18 +338,12 @@ class CreateAccScreen(QDialog):
         btn.setGeometry(geo)
 
     def reset_state(self):
-        import src.app_state as app_state
-        app_state.access_token = None
-        app_state.refresh_token = None
-        app_state.current_user = None
-
         self.emailfield.clear()
         self.passwordfield.clear()
         self.confirmpasswordfield.clear()
         self.error.setText("")
 
     def signupfunction(self):
-        # Treat this as email input
         email = self.emailfield.text().strip()
         password = self.passwordfield.text()
         confirmpassword = self.confirmpasswordfield.text()
@@ -347,10 +356,7 @@ class CreateAccScreen(QDialog):
             self.error.setText("Passwords do not match.")
             return
 
-        # For backend: use email as both username & email
         username = email
-
-        # Clear previous error
         self.error.setText("")
 
         try:
@@ -359,13 +365,8 @@ class CreateAccScreen(QDialog):
             self.error.setText(str(e))
             return
 
-        # Success
         show_toast("Account created successfully!")
-
-        # Optionally clear inputs
         self.emailfield.clear()
         self.passwordfield.clear()
         self.confirmpasswordfield.clear()
-
-        # Back to welcome
         slide_to_index(0, direction=-1)
