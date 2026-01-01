@@ -18,7 +18,7 @@ import {
   Tooltip,
 } from "@heroui/react";
 import { FiDownload, FiImage, FiGrid, FiType } from "react-icons/fi";
-import { TbPhoto, TbFileTypePdf, TbFileTypeSvg } from "react-icons/tb";
+import { TbPhoto, TbFileTypePdf } from "react-icons/tb";
 
 import {
   ExportOptions,
@@ -35,11 +35,11 @@ interface ExportModalProps {
   isExporting: boolean;
 }
 
+// Removed SVG from format options
 const formatOptions = [
   { key: "png", label: "PNG", icon: <TbPhoto /> },
   { key: "jpg", label: "JPEG", icon: <FiImage /> },
   { key: "pdf", label: "PDF", icon: <TbFileTypePdf /> },
-  { key: "svg", label: "SVG", icon: <TbFileTypeSvg /> },
 ];
 
 const qualityOptions = [
@@ -195,9 +195,13 @@ export default function ExportModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Switch
-                  isSelected={options.includeGrid}
+                  isSelected={options.showGrid || options.includeGrid}
                   onValueChange={(value) =>
-                    setOptions((prev) => ({ ...prev, includeGrid: value }))
+                    setOptions((prev) => ({ 
+                      ...prev, 
+                      showGrid: value,
+                      includeGrid: value // Keep both for compatibility
+                    }))
                   }
                 >
                   <div className="flex items-center gap-2">
@@ -224,7 +228,7 @@ export default function ExportModal({
                   label="Watermark Text"
                   placeholder="Enter watermark text"
                   size="sm"
-                  value={options.watermarkText}
+                  value={options.watermarkText || ""}
                   onChange={(e) =>
                     setOptions((prev) => ({
                       ...prev,
@@ -274,7 +278,10 @@ export default function ExportModal({
                               ? "ring-2 ring-blue-500 ring-offset-2"
                               : ""
                           }`}
-                          style={{ backgroundColor: color }}
+                          style={{ 
+                            backgroundColor: color === "transparent" ? "#ffffff" : color,
+                            borderColor: color === "transparent" ? "#e5e7eb" : color
+                          }}
                           onClick={() =>
                             setOptions((prev) => ({
                               ...prev,
