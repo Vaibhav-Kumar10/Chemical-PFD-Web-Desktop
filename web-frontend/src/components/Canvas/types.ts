@@ -80,12 +80,7 @@ export interface CanvasItemImageProps {
   onChange: (newAttrs: CanvasItem) => void;
   onDragEnd?: (item: CanvasItem) => void;
   onTransformEnd?: (item: CanvasItem) => void;
-  onGripMouseDown?: (
-    itemId: number,
-    gripIndex: number,
-    x: number,
-    y: number,
-  ) => void;
+  onGripMouseDown?: (itemId: number, gripIndex: number, x: number, y: number) => void;
   onGripMouseEnter?: (itemId: number, gripIndex: number) => void;
   onGripMouseLeave?: () => void;
   isDrawingConnection?: boolean;
@@ -102,21 +97,8 @@ export interface CanvasPropertiesSidebarProps {
   showAllItemsByDefault?: boolean;
 }
 
-// Export image types
-export type ExportFormat = "png" | "jpg" | "svg" | "pdf";
-export type ExportQuality = "low" | "medium" | "high";
-
-export interface ExportOptions {
-  format: ExportFormat;
-  quality: ExportQuality;
-  scale: number;
-  includeGrid: boolean;
-  includeWatermark: boolean;
-  watermarkText: string;
-  padding: number;
-  backgroundColor: string;
-}
-
+// Export image types 
+ 
 export interface ExportPreset {
   id: string;
   name: string;
@@ -124,62 +106,118 @@ export interface ExportPreset {
   options: Partial<ExportOptions>;
 }
 
+ 
+export type ExportFormat = 'png' | 'jpg' | 'pdf' | 'export';
+export type ExportQuality = 'low' | 'medium' | 'high';
+export interface ExportOptions {
+  format: 'png' | 'jpg' | 'pdf' | 'export';
+  scale: number;
+  backgroundColor: string;
+  padding: number;
+  showGrid: boolean;
+  includeGrid: boolean;
+  quality: 'low' | 'medium' | 'high';
+  connections?: Connection[];
+}
+
 export const defaultExportOptions: ExportOptions = {
-  format: "png",
-  quality: "high",
+  format: 'png',
   scale: 2,
-  includeGrid: false,
+  quality: 'high',
+  padding: 40,
+  backgroundColor: '#ffffff',
+  showGrid: false,
   includeWatermark: false,
-  watermarkText: "",
-  padding: 20,
-  backgroundColor: "#ffffff",
+  watermarkText: '',
+  includeGrid: false,
 };
 
-export const exportPresets: ExportPreset[] = [
+export const exportPresets = [
   {
-    id: "presentation",
-    name: "Presentation",
-    description: "High quality for slides",
+    id: 'presentation',
+    name: 'Presentation',
+    description: 'High-res PNG for slides',
     options: {
-      format: "png",
-      quality: "high",
+      format: 'png' as ExportFormat,
       scale: 2,
-      includeGrid: false,
-      backgroundColor: "#ffffff",
-    },
-  },
-  {
-    id: "print",
-    name: "Print",
-    description: "High resolution for printing",
-    options: {
-      format: "pdf",
-      quality: "high",
-      scale: 3,
-      includeGrid: false,
+      quality: 'high' as ExportQuality,
       padding: 40,
+      backgroundColor: '#ffffff',
+      showGrid: false,
     },
   },
   {
-    id: "web",
-    name: "Web",
-    description: "Optimized for web",
+    id: 'print',
+    name: 'Print',
+    description: 'PDF for printing',
     options: {
-      format: "jpg",
-      quality: "medium",
+      format: 'pdf' as ExportFormat,
+      scale: 3,
+      quality: 'high' as ExportQuality,
+      padding: 60,
+      backgroundColor: '#ffffff',
+      showGrid: false,
+    },
+  },
+  {
+    id: 'web',
+    name: 'Web',
+    description: 'Optimized JPG for web',
+    options: {
+      format: 'jpg' as ExportFormat,
       scale: 1,
-      includeGrid: false,
+      quality: 'medium' as ExportQuality,
+      padding: 20,
+      backgroundColor: '#ffffff',
+      showGrid: false,
     },
   },
   {
-    id: "technical",
-    name: "Technical",
-    description: "Include grid for documentation",
+    id: 'dark',
+    name: 'Dark Mode',
+    description: 'Dark background export',
     options: {
-      format: "svg",
-      quality: "high",
-      includeGrid: true,
-      padding: 30,
+      format: 'png' as ExportFormat,
+      scale: 2,
+      quality: 'high' as ExportQuality,
+      padding: 40,
+      backgroundColor: '#1e293b',
+      showGrid: false,
     },
   },
 ];
+// Add interface for the custom export format
+export interface DiagramExportData {
+  // Document metadata
+  version: string;
+  exportedAt: string;
+  editorVersion: string;
+  
+  // Canvas state (what's needed to restore everything)
+  canvasState: {
+    items: CanvasItem[];
+    connections: Connection[];
+    counts: Record<string, number>;
+    sequenceCounter: number;
+  };
+  
+  // Viewport state (so we can restore zoom/position)
+  viewport: {
+    scale: number;
+    position: { x: number; y: number };
+    gridSize: number;
+    showGrid: boolean;
+    snapToGrid: boolean;
+  };
+  
+  // Project metadata
+  project: {
+    id: string;
+    name: string;
+    createdAt: string;
+    lastModified: string;
+  };
+  
+  // Export settings used
+  exportSettings?: Partial<ExportOptions>;
+}
