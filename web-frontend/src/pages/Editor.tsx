@@ -641,7 +641,7 @@ export default function Editor() {
           // Select all items
           const allItemIds = new Set(droppedItems.map((item) => item.id));
           setSelectedItemIds(allItemIds);
-          
+
           // Select all connections
           const allConnectionIds = new Set(connections.map((conn) => conn.id));
           setSelectedConnectionIds(allConnectionIds);
@@ -676,9 +676,9 @@ export default function Editor() {
         handler: handleCenterToContent,
       },
       {
-        key: "d",
+        key: "delete",
         label: "Delete Selection",
-        display: "d",
+        display: "d / Del / Backspace",
         requireCtrl: false,
         handler: () => {
           if (!projectId) return;
@@ -728,7 +728,7 @@ export default function Editor() {
         const matchesKey =
           key === shortcut.key ||
           (shortcut.key === "delete" &&
-            (key === "delete" || key === "backspace"));
+            (key === "delete" || key === "backspace" || key === "d"));
 
         if (matchesKey && (!shortcut.requireCtrl || isCtrlOrCmd(e))) {
           e.preventDefault();
@@ -1359,7 +1359,7 @@ export default function Editor() {
           }}
         >
           <FileDropZone />
-          
+
           {/* Left Sidebar Collapse Button */}
           <button
             className="absolute top-1/2 -translate-y-1/2 left-2 z-30 w-8 h-16 flex items-center justify-center
@@ -1399,7 +1399,7 @@ export default function Editor() {
               <TbLayoutSidebarRightExpand className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
             )}
           </button>
-          
+
 
           <Stage
             ref={stageRef}
