@@ -123,6 +123,13 @@ export const CanvasItemImage = ({
       {isSelected && (
         <Transformer
           ref={trRef}
+          enabledAnchors={[
+            'top-left',
+            'top-right',
+            'bottom-left',
+            'bottom-right',
+          ]}
+          keepRatio={true}
           boundBoxFunc={(oldBox, newBox) => {
             if (newBox.width < 5 || newBox.height < 5) {
               return oldBox;
