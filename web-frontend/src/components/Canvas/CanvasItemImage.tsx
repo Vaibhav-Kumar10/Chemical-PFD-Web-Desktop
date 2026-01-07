@@ -11,7 +11,6 @@ import Konva from "konva";
 
 import { CanvasItemImageProps } from "./types";
 
-const LABEL_HEIGHT = 24;
 const LABEL_OFFSET = 4;
 
 export const CanvasItemImage = ({
@@ -110,19 +109,25 @@ export const CanvasItemImage = ({
         fill="#374151"
         fontFamily="Arial, sans-serif"
         fontSize={12}
-        height={LABEL_HEIGHT - 4}
         listening={false}
         text={labelText}
-        verticalAlign="middle"
-        width={item.width}
-        x={labelX}
+        width={150}
+        x={labelX + item.width / 2}
         y={labelY + 2}
+        offsetX={75}
       />
 
       {/* ================= TRANSFORMER ================= */}
       {isSelected && (
         <Transformer
           ref={trRef}
+          enabledAnchors={[
+            'top-left',
+            'top-right',
+            'bottom-left',
+            'bottom-right',
+          ]}
+          keepRatio={true}
           boundBoxFunc={(oldBox, newBox) => {
             if (newBox.width < 5 || newBox.height < 5) {
               return oldBox;

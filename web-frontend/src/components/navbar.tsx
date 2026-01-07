@@ -19,28 +19,55 @@ export const CNavbar = () => {
 
   return (
     <>
-      <Navbar isBordered maxWidth="xl">
+      <Navbar
+        classNames={{
+          base: "bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800",
+          wrapper: "px-6",
+        }}
+        isBordered={false}
+        maxWidth="full"
+        position="sticky"
+      >
         <NavbarBrand
-          className="cursor-pointer"
+          className="cursor-pointer gap-3 hover:opacity-80 transition-opacity"
           onClick={() => navigate("/dashboard")}
         >
-          <p className="font-bold text-inherit text-xl">🧪 ChemPFD</p>
+          <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
+            <p className="text-white text-xl">🧪</p>
+          </div>
+          <div className="flex flex-col">
+            <p className="font-bold text-inherit text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              ChemPFD
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Process Flow Designer</p>
+          </div>
         </NavbarBrand>
 
-        <NavbarContent className="hidden sm:flex gap-4" justify="center">
+        <NavbarContent className="hidden sm:flex gap-2" justify="center">
           <NavbarItem isActive={location.pathname === "/dashboard"}>
-            <Link color="foreground" href="/dashboard">
+            <Link
+              color={location.pathname === "/dashboard" ? "primary" : "foreground"}
+              href="/dashboard"
+              className={`px-4 py-2 rounded-lg transition-all ${location.pathname === "/dashboard"
+                  ? "bg-blue-100 dark:bg-blue-900/30 font-semibold"
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+            >
               Dashboard
             </Link>
           </NavbarItem>
           <NavbarItem isActive={location.pathname === "/components"}>
-            <Link color="foreground" href="/components">
+            <Link
+              color={location.pathname === "/components" ? "primary" : "foreground"}
+              href="/components"
+              className={`px-4 py-2 rounded-lg transition-all ${location.pathname === "/components"
+                  ? "bg-blue-100 dark:bg-blue-900/30 font-semibold"
+                  : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+            >
               Components DB
             </Link>
           </NavbarItem>
-          {/* <NavbarItem isActive={location.pathname === "/reports"}> */}
-          {/* <Link color="foreground" href="/reports">Reports</Link> */}
-          {/* </NavbarItem>  */}
         </NavbarContent>
 
         <NavbarContent justify="end">
@@ -54,7 +81,7 @@ export const CNavbar = () => {
                 <Avatar
                   isBordered
                   as="button"
-                  className="transition-transform"
+                  className="transition-transform hover:scale-110"
                   color="primary"
                   name={username[0]?.toUpperCase() || "U"}
                   size="sm"
@@ -66,23 +93,33 @@ export const CNavbar = () => {
                   <User
                     avatarProps={{
                       src: "",
-                      name: username[0]?.toUpperCase() || "U"
+                      name: username[0]?.toUpperCase() || "U",
+                      isBordered: true,
+                      color: "primary"
                     }}
                     classNames={{
-                      base: "gap-8",
-                      name: "text-default-800",
+                      base: "gap-3",
+                      name: "text-default-800 font-semibold",
                       description: "text-default-500",
                     }}
-                    description=""
+                    description="Professional Edition"
                     name={username}
                   />
                 </div>
                 <Divider />
                 <div className="flex flex-col gap-1 p-1">
-                  <Button className="justify-start" size="sm" variant="light">
+                  <Button
+                    className="justify-start hover:bg-gray-100 dark:hover:bg-gray-800"
+                    size="sm"
+                    variant="light"
+                  >
                     My Settings
                   </Button>
-                  <Button className="justify-start" size="sm" variant="light">
+                  <Button
+                    className="justify-start hover:bg-gray-100 dark:hover:bg-gray-800"
+                    size="sm"
+                    variant="light"
+                  >
                     Help & Feedback
                   </Button>
                   <Divider className="my-1" />

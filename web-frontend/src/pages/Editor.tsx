@@ -11,6 +11,7 @@ import {
   DropdownItem,
   Tooltip,
   Switch,
+  Slider,
 } from "@heroui/react";
 import {
   TbLayoutSidebarRightExpand,
@@ -76,6 +77,8 @@ export default function Editor() {
   const [snapToGrid, setSnapToGrid] = useState(true);
 
   const [gridSize, setGridSize] = useState(20);
+  const [componentSize, setComponentSize] = useState(1500); // Component drop size
+  const prevComponentSizeRef = useRef(1500); // Track previous size for scaling
   // In your state section, add:
   const [isImporting, setIsImporting] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -174,6 +177,31 @@ export default function Editor() {
   const connections = useMemo(() => {
     return currentState?.connections || [];
   }, [currentState?.connections]);
+
+  // Update all existing components when size slider changes
+  useEffect(() => {
+    if (!projectId || droppedItems.length === 0) return;
+
+    const prevSize = prevComponentSizeRef.current;
+    if (prevSize === componentSize) return; // No change
+
+    // Calculate scale factor
+    const scaleFactor = Math.sqrt(componentSize / prevSize);
+
+    // Update all items proportionally
+    const updates = droppedItems.map(item => ({
+      id: item.id,
+      patch: {
+        width: item.width * scaleFactor,
+        height: item.height * scaleFactor,
+      }
+    }));
+
+    editorStore.batchUpdateItems(projectId, updates);
+
+    // Update the ref for next change
+    prevComponentSizeRef.current = componentSize;
+  }, [componentSize, projectId, droppedItems, editorStore]);
 
   const canUndo = projectId ? editorStore.canUndo(projectId) : false;
   const canRedo = projectId ? editorStore.canRedo(projectId) : false;
@@ -633,6 +661,21 @@ export default function Editor() {
         handler: () => projectId && editorStore.undo(projectId),
       },
       {
+        key: "a",
+        label: "Select All",
+        display: "Ctrl + A",
+        requireCtrl: true,
+        handler: () => {
+          // Select all items
+          const allItemIds = new Set(droppedItems.map((item) => item.id));
+          setSelectedItemIds(allItemIds);
+
+          // Select all connections
+          const allConnectionIds = new Set(connections.map((conn) => conn.id));
+          setSelectedConnectionIds(allConnectionIds);
+        },
+      },
+      {
         key: "g",
         label: "Toggle Grid",
         display: "Ctrl+G",
@@ -661,9 +704,9 @@ export default function Editor() {
         handler: handleCenterToContent,
       },
       {
-        key: "d",
+        key: "delete",
         label: "Delete Selection",
-        display: "d",
+        display: "d / Del / Backspace",
         requireCtrl: false,
         handler: () => {
           if (!projectId) return;
@@ -699,6 +742,8 @@ export default function Editor() {
       selectedItemIds,
       selectedConnectionIds,
       snapToGrid,
+      droppedItems,
+      connections,
     ],
   );
 
@@ -711,7 +756,7 @@ export default function Editor() {
         const matchesKey =
           key === shortcut.key ||
           (shortcut.key === "delete" &&
-            (key === "delete" || key === "backspace"));
+            (key === "delete" || key === "backspace" || key === "d"));
 
         if (matchesKey && (!shortcut.requireCtrl || isCtrlOrCmd(e))) {
           e.preventDefault();
@@ -801,15 +846,14 @@ export default function Editor() {
 
         img.onload = () => {
           const aspectRatio = img.width / img.height;
-          const baseSize = 80;
-          let width = baseSize;
-          let height = baseSize;
+          // Use the dynamic component size from slider
+          const targetArea = componentSize;
+          let width: number;
+          let height: number;
 
-          if (aspectRatio > 1) {
-            height = baseSize / aspectRatio;
-          } else {
-            width = baseSize * aspectRatio;
-          }
+          // Calculate dimensions to match target area while maintaining aspect ratio
+          height = Math.sqrt(targetArea / aspectRatio);
+          width = height * aspectRatio;
 
           finalizeAdd(width, height);
         };
@@ -1294,21 +1338,6 @@ export default function Editor() {
       >
         {/* Left Sidebar - Component Library */}
         <div className="relative overflow-hidden border-r border-gray-200 dark:border-gray-800">
-          {/* Collapse Button */}
-          <button
-            className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center
-            rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700
-            hover:bg-gray-100 dark:hover:bg-gray-700"
-            title={leftCollapsed ? "Expand" : "Collapse"}
-            onClick={() => setLeftCollapsed((v) => !v)}
-          >
-            {!leftCollapsed ? (
-              <TbLayoutSidebarLeftCollapse />
-            ) : (
-              <TbLayoutSidebarLeftExpand />
-            )}
-          </button>
-
           {!leftCollapsed && (
             <ComponentLibrarySidebar
               components={components}
@@ -1357,6 +1386,48 @@ export default function Editor() {
           }}
         >
           <FileDropZone />
+
+          {/* Left Sidebar Collapse Button */}
+          <button
+            className="absolute top-1/2 -translate-y-1/2 left-2 z-30 w-8 h-16 flex items-center justify-center
+            rounded-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900
+            border border-gray-300/50 dark:border-gray-600/50
+            shadow-lg hover:shadow-xl
+            hover:scale-105 active:scale-95
+            transition-all duration-200 ease-out
+            hover:border-blue-400/50 dark:hover:border-blue-500/50
+            group pointer-events-auto"
+            title={leftCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onClick={() => setLeftCollapsed((v) => !v)}
+          >
+            {!leftCollapsed ? (
+              <TbLayoutSidebarLeftCollapse className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            ) : (
+              <TbLayoutSidebarLeftExpand className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            )}
+          </button>
+
+          {/* Right Sidebar Collapse Button */}
+          <button
+            className="absolute top-1/2 -translate-y-1/2 right-2 z-30 w-8 h-16 flex items-center justify-center
+            rounded-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900
+            border border-gray-300/50 dark:border-gray-600/50
+            shadow-lg hover:shadow-xl
+            hover:scale-105 active:scale-95
+            transition-all duration-200 ease-out
+            hover:border-blue-400/50 dark:hover:border-blue-500/50
+            group pointer-events-auto"
+            title={rightCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onClick={() => setRightCollapsed((v: boolean) => !v)}
+          >
+            {!rightCollapsed ? (
+              <TbLayoutSidebarRightCollapse className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            ) : (
+              <TbLayoutSidebarRightExpand className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            )}
+          </button>
+
+
           <Stage
             ref={stageRef}
             draggable
@@ -1495,7 +1566,7 @@ export default function Editor() {
           </Stage>
 
           {/* Floating Info Bubble */}
-          <div className="absolute bottom-6 right-[38%] flex flex-col items-end gap-2 pointer-events-none">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none">
             <div className="flex items-center gap-3 px-4 py-2 bg-white/90 dark:bg-[#1f2938] backdrop-blur shadow-lg border border-gray-200 rounded-full text-xs font-mono text-gray-600 pointer-events-auto">
               {/* XY Coordinates */}
               <div className="flex gap-2 dark:text-gray-200">
@@ -1549,6 +1620,31 @@ export default function Editor() {
                     }
                     onValueChange={setSnapToGrid}
                   />
+                </Tooltip>
+              </div>
+
+              <div className="w-px h-3 bg-gray-300" />
+
+              {/* Component Size Slider */}
+              <div className="flex items-center gap-2">
+                <Tooltip content="Component Size" placement="top">
+                  <div className="flex items-center gap-2 px-2">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Size</span>
+                    <Slider
+                      aria-label="Component Size"
+                      size="sm"
+                      step={100}
+                      minValue={1000}
+                      maxValue={3000}
+                      value={componentSize}
+                      onChange={(value) => setComponentSize(value as number)}
+                      className="w-24"
+                      classNames={{
+                        track: "bg-gradient-to-r from-blue-200 to-blue-400 dark:from-blue-800 dark:to-blue-600",
+                        thumb: "bg-blue-600 dark:bg-blue-500"
+                      }}
+                    />
+                  </div>
                 </Tooltip>
               </div>
 
@@ -1707,21 +1803,6 @@ export default function Editor() {
         </div>
         {/* Right Sidebar - Canvas Properties/Items List */}
         <div className="relative overflow-hidden border-l border-gray-200 dark:border-gray-800 hidden lg:block">
-          {/* Collapse Button */}
-          <button
-            className="absolute top-2 left-2 z-10 w-7 h-7 flex items-center justify-center
-      rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700
-      hover:bg-gray-100 dark:hover:bg-gray-700"
-            title={rightCollapsed ? "Expand" : "Collapse"}
-            onClick={() => setRightCollapsed((v: boolean) => !v)}
-          >
-            {!rightCollapsed ? (
-              <TbLayoutSidebarRightCollapse />
-            ) : (
-              <TbLayoutSidebarRightExpand />
-            )}
-          </button>
-
           {!rightCollapsed && (
             <CanvasPropertiesSidebar
               showAllItemsByDefault
