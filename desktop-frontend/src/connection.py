@@ -461,15 +461,18 @@ class Connection:
 
 
     def paint(self, painter, theme="light", zoom=1.0):
+        # Determine visual width based on selection
+        visual_width = 4.0 if self.is_selected else 2.5
+        
+        # Calculate LOGICAL width to maintain constant VISUAL width
+        pen_width = visual_width / max(0.1, zoom)
+
         if self.is_selected:
-            pen = QPen(QColor("#2563eb"), 3)
-            brush_color = QColor("#2563eb")
+            color = QColor("#2563eb")
+            pen = QPen(color, pen_width)
+            brush_color = color
         else:
             color = Qt.white if theme == "dark" else Qt.black
-            
-            # Scale line width to be constant VISUAL width (e.g. 2.5px)
-            visual_width = 2.5
-            pen_width = visual_width / max(0.1, zoom)
             pen = QPen(color, pen_width)
             brush_color = color
 
