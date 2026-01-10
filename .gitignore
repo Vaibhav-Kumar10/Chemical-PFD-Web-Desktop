@@ -1,32 +1,44 @@
+# ========================
 # Python
+# ========================
 __pycache__/
 *.pyc
 *.pyo
 *.env
-venv/
 
+# Virtual environments
+env/
+venv/
+.venv/
+
+# ========================
 # Django
+# ========================
 db.sqlite3
 *.log
 
-# Node
+# ========================
+# Node / Frontend
+# ========================
 node_modules/
-npm-debug.log
+npm-debug.log*
 yarn.lock
+pnpm-lock.yaml
 
-# Build folders
+# ========================
+# Build output
+# ========================
 dist/
 build/
-*.spec
 
-# OS
+# ========================
+# OS files
+# ========================
 .DS_Store
 Thumbs.db
 
-# IDE
+# ========================
+# IDE / Editor
+# ========================
 .vscode/
 .idea/
-
-#Image
-.svg
-.png

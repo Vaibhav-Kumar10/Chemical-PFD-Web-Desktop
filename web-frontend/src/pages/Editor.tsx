@@ -1,82 +1,1033 @@
-import { useEffect, useState, useRef } from "react";
+// Editor.tsx (integrated version)
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Stage, Layer } from "react-konva";
+import { Stage, Layer, Line, Shape } from "react-konva";
 import Konva from "konva";
-import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react";
-import { SearchIcon } from "@/components/icons";
-import { ComponentsConfig, componentsConfig } from "@/assets/config/items";
+import {
+  Button,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Tooltip,
+  Switch,
+  Slider,
+} from "@heroui/react";
+import {
+  TbLayoutSidebarRightExpand,
+  TbLayoutSidebarRightCollapse,
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
+  TbFileImport,
+} from "react-icons/tb";
+import { MdZoomIn, MdZoomOut, MdCenterFocusWeak } from "react-icons/md";
+import { FiDownload } from "react-icons/fi";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
+import { TbGridDots, TbGridPattern } from "react-icons/tb";
+
 import { ThemeSwitch } from "@/components/theme-switch";
+import { CanvasItemImage } from "@/components/Canvas/CanvasItemImage";
+import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
+import {
+  ComponentLibrarySidebar,
+  CanvasPropertiesSidebar,
+} from "@/components/Canvas/ComponentLibrarySidebar";
+import { calculateManualPathsWithBridges } from "@/utils/routing";
+import { useComponents } from "@/context/ComponentContext";
+import ExportModal from "@/components/Canvas/ExportModal";
+import { exportDiagram, downloadBlob } from "@/utils/exports";
+import { ExportOptions } from "@/components/Canvas/types";
+import { useEditorStore } from "@/store/useEditorStore";
+import {
+  type ComponentItem,
+  type CanvasItem,
+  type Connection,
+} from "@/components/Canvas/types";
+import { ExportReportModal } from "@/components/Canvas/ExportReportModal";
+import {
+  createExportData,
+  exportToDiagramFile,
+  importFromDiagramFile,
+  migrateExportData,
+} from "@/utils/diagramExport";
+import { SaveConfirmationModal } from "@/components/SaveConfirmationModal";
+import { UnsavedChangesModal } from "@/components/UnsavedChangesModal";
+import { NewProjectModal } from "@/components/NewProjectModal";
+// import {
+//   getProject,
+//   saveProject,
+//   createProject,
+//   type SavedProject,
+//   convertToBackendFormat,
+// } from "@/utils/projectStorage";
+import {
+  fetchProject,
+  saveProjectCanvas,
+  createProject,
+} from "@/api/projectApi";
+import { convertToBackendFormat, SavedProject } from "@/utils/projectStorage";
 
-interface ComponentItem {
-  name: string;
-  icon: string;
-  svg: string;
-  class: string;
-  object: string;
-  args: readonly any[];
-}
-
-interface CanvasItem extends ComponentItem {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+type Shortcut = {
+  key: string;
+  label: string;
+  display: string;
+  handler: () => void;
+  requireCtrl?: boolean;
+};
 
 export default function Editor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const [components, setComponents] = useState<ComponentsConfig>(componentsConfig);
-  const [droppedItems, setDroppedItems] = useState<CanvasItem[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+
+  const [gridSize, setGridSize] = useState(20);
+  const [componentSize, setComponentSize] = useState(1500); // Component drop size
+  const prevComponentSizeRef = useRef(1500); // Track previous size for scaling
+  // In your state section, add:
+  const [isImporting, setIsImporting] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [projectMetadata, setProjectMetadata] = useState<Pick<
+    SavedProject,
+    "name" | "description"
+  > | null>(null);
+
+  // Unsaved changes tracking
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedState, setLastSavedState] = useState<string | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [unsavedContext, setUnsavedContext] = useState<
+    "navigation" | "newProject"
+  >("navigation");
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+
+  // Get editor store methods
+  const editorStore = useEditorStore();
+
+  // Get current state from store
+  const currentState = useMemo(() => {
+    if (!projectId) return null;
+
+    return editorStore.getEditorState(projectId);
+  }, [projectId, editorStore]);
+
+  // Initialize editor when projectId changes and load from localStorage
+  // useEffect(() => {
+  //   if (!projectId) return;
+
+  //   // Try to load project from localStorage
+  //   const savedProject = getProject(Number(projectId));
+
+  //   if (savedProject) {
+  //     // Load project metadata
+  //     setProjectMetadata({
+  //       name: savedProject.name,
+  //       description: savedProject.description,
+  //     });
+
+  //     // Hydrate editor with saved canvas state
+  //     // Convert BackendCanvasItem to CanvasItem format
+  //     const canvasItems = savedProject.canvas_state.items.map(item => ({
+  //       id: item.id,
+  //       name: item.name || item.object || 'Component',
+  //       icon: item.png || item.svg || '',
+  //       svg: item.svg || '',
+  //       class: item.object || '',
+  //       object: item.object || '',
+  //       args: [],
+  //       addedAt: Date.now(),
+  //       x: item.x,
+  //       y: item.y,
+  //       width: item.width,
+  //       height: item.height,
+  //       rotation: item.rotation,
+  //       scaleX: item.scaleX,
+  //       scaleY: item.scaleY,
+  //       sequence: item.sequence,
+  //       label: item.label,
+  //       grips: item.grips,
+  //       legend: item.legend,
+  //       suffix: item.suffix,
+  //       png: item.png,
+  //     } as any));
+
+  //     editorStore.hydrateEditor(projectId, {
+  //       items: canvasItems,
+  //       connections: savedProject.canvas_state.connections,
+  //       counts: {}, // Will be recalculated
+  //       sequenceCounter: savedProject.canvas_state.sequence_counter,
+  //     });
+
+  //     // Restore viewport settings if available
+  //     if (savedProject.viewport) {
+  //       setStageScale(savedProject.viewport.scale);
+  //       setStagePos(savedProject.viewport.position);
+  //       setGridSize(savedProject.viewport.gridSize);
+  //       setShowGrid(savedProject.viewport.showGrid);
+  //       setSnapToGrid(savedProject.viewport.snapToGrid);
+  //     }
+  //   } else {
+  //     // New project, just initialize
+  //     editorStore.initEditor(projectId);
+  //     setProjectMetadata({
+  //       name: `Project ${projectId}`,
+  //       description: null,
+  //     });
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [projectId]); // Only depend on projectId, not editorStore
+  useEffect(() => {
+    if (!projectId) return;
+
+    let mounted = true;
+
+    const loadProject = async () => {
+      try {
+        // 1) Fetch from backend
+        const resp = await fetchProject(Number(projectId));
+
+        if (!mounted) return;
+
+        // resp may be wrapped with status keys in backend, get project object
+        // In your backend, ProjectDetailView returns project serializer + "canvas_state".
+        const projectObj = resp; // resp already contains fields + canvas_state per backend
+
+        // Update metadata
+        setProjectMetadata({
+          name: projectObj.name ?? `Project ${projectId}`,
+          description: projectObj.description ?? null,
+        });
+
+        // Canvas data (might be located at projectObj.canvas_state or resp.canvas_state)
+        const canvasState =
+          projectObj.canvas_state ?? projectObj.canvas_state ?? null;
+
+        if (canvasState && canvasState.items) {
+          // Convert backend CanvasState -> CanvasItem (your frontend types)
+          const canvasItems = canvasState.items.map((item: any) => {
+            const objectKey =
+              item.object ||
+              item.name ||
+              (item.component ? item.component.name : "");
+
+            return {
+              id: item.id,
+              name:
+                item.name ||
+                (item.component && item.component.name) ||
+                objectKey ||
+                "Component",
+              icon: item.png || "",
+              svg: item.svg || "",
+              class: item.object || item.class || "",
+              object:
+                item.object || (item.component && item.component.name) || "",
+              args: item.args || [],
+              addedAt: Date.now(),
+              x: item.x ?? 0,
+              y: item.y ?? 0,
+              width: item.width ?? item.w ?? 80,
+              height: item.height ?? item.h ?? 80,
+              rotation: item.rotation ?? 0,
+              scaleX: item.scaleX ?? 1,
+              scaleY: item.scaleY ?? 1,
+              sequence: item.sequence ?? 0,
+              label: item.label ?? "",
+              grips: item.grips ?? [],
+              legend: item.legend ?? "",
+              suffix: item.suffix ?? "",
+              png: item.png ?? "",
+              objectKey,
+            } as any;
+          });
+
+          // connections come as array
+          const connections = canvasState.connections ?? [];
+
+          // Build initial counts (derive counts from items)
+          const counts: Record<string, number> = {};
+
+          canvasItems.forEach((it: any) => {
+            const k = it.objectKey ?? it.object ?? it.name ?? "Component";
+
+            counts[k] = (counts[k] || 0) + 1;
+          });
+
+          // hydrate editor store
+          editorStore.hydrateEditor(projectId, {
+            items: canvasItems,
+            connections,
+            counts,
+            sequenceCounter:
+              canvasState.sequence_counter ??
+              (canvasItems.length
+                ? Math.max(...canvasItems.map((i: any) => i.sequence)) + 1
+                : 0),
+          });
+
+          // restore viewport if present in response
+          if (projectObj.viewport) {
+            setStageScale(projectObj.viewport.scale ?? 1);
+            setStagePos(projectObj.viewport.position ?? { x: 0, y: 0 });
+            setGridSize(projectObj.viewport.gridSize ?? gridSize);
+            setShowGrid(projectObj.viewport.showGrid ?? showGrid);
+            setSnapToGrid(projectObj.viewport.snapToGrid ?? snapToGrid);
+          }
+        } else {
+          // No canvas state -> initialize an empty editor (frontend only)
+          editorStore.initEditor(projectId);
+        }
+      } catch (error) {
+        console.error("Failed to load project from backend:", error);
+        // fallback: initialize empty editor (optional)
+        editorStore.initEditor(projectId);
+      }
+    };
+
+    loadProject();
+
+    return () => {
+      mounted = false;
+    };
+  }, [projectId]); // depends on projectId
+
+  // Extract data from current state
+  const droppedItems = useMemo(() => {
+    if (!projectId) return [];
+
+    return editorStore.getItemsInOrder(projectId);
+  }, [projectId, editorStore, currentState?.items]);
+
+  const connections = useMemo(() => {
+    return currentState?.connections || [];
+  }, [currentState?.connections]);
+
+  // Update all existing components when size slider changes
+  useEffect(() => {
+    if (!projectId || droppedItems.length === 0) return;
+
+    const prevSize = prevComponentSizeRef.current;
+
+    if (prevSize === componentSize) return; // No change
+
+    // Calculate scale factor
+    const scaleFactor = Math.sqrt(componentSize / prevSize);
+
+    // Update all items proportionally
+    const updates = droppedItems.map((item) => ({
+      id: item.id,
+      patch: {
+        width: item.width * scaleFactor,
+        height: item.height * scaleFactor,
+      },
+    }));
+
+    editorStore.batchUpdateItems(projectId, updates);
+
+    // Update the ref for next change
+    prevComponentSizeRef.current = componentSize;
+  }, [componentSize, projectId, droppedItems, editorStore]);
+
+  const canUndo = projectId ? editorStore.canUndo(projectId) : false;
+  const canRedo = projectId ? editorStore.canRedo(projectId) : false;
+
+  const isCtrlOrCmd = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
+
+  // Export diagram states
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Add this component inside your Editor component, after all state declarations
+  const FileDropZone = () => {
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      const file = e.dataTransfer.files[0];
+
+      if (!file || !file.name.endsWith(".export")) return;
+
+      // Create a synthetic event for handleImportDiagram
+      const syntheticEvent = {
+        target: {
+          files: [file],
+        },
+      } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+      await handleImportDiagram(syntheticEvent);
+    };
+
+    if (!isDragging) return null;
+
+    return (
+      <div
+        className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm border-4 border-dashed border-blue-400 rounded-lg"
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-2xl">
+          <TbFileImport className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+            Drop Diagram File Here
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            .export files only
+          </p>
+        </div>
+      </div>
+    );
+  };
+  const handleImportDiagram = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file || !projectId) return;
+
+    setIsImporting(true);
+
+    try {
+      const importData = await importFromDiagramFile(file);
+      const migratedData = migrateExportData(importData);
+
+      // Restore the canvas state
+      editorStore.hydrateEditor(projectId, migratedData.canvasState);
+
+      // Restore viewport settings
+      setStageScale(migratedData.viewport.scale);
+      setStagePos(migratedData.viewport.position);
+      setGridSize(migratedData.viewport.gridSize);
+      setShowGrid(migratedData.viewport.showGrid);
+      setSnapToGrid(migratedData.viewport.snapToGrid);
+
+      alert(`Diagram "${migratedData.project.name}" imported successfully!`);
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert(`Import failed: ${(error as Error).message}`);
+    } finally {
+      setIsImporting(false);
+      event.target.value = ""; // Reset file input
+    }
+  };
+  // In your Editor.tsx handleExport function:
+  const handleExport = async (options: ExportOptions) => {
+    if (!projectId || !currentState) {
+      alert("No project loaded");
+
+      return;
+    }
+
+    setIsExporting(true);
+
+    // Save current grid state for image exports
+    const originalShowGrid = showGrid;
+
+    try {
+      if (options.format === "export") {
+        // Custom diagram file export
+        const exportData = createExportData(
+          currentState,
+          {
+            scale: stageScale,
+            position: stagePos,
+            gridSize: gridSize,
+            showGrid: showGrid,
+            snapToGrid: snapToGrid,
+          },
+          projectId,
+          `Diagram ${projectId}`,
+        );
+
+        // Use the filename from options or generate default
+        const fileName = options.filename
+          ? `${options.filename}.pfd`
+          : `diagram-${projectId}.pfd`;
+
+        exportToDiagramFile(exportData, fileName);
+        setShowExportModal(false);
+
+        return;
+      }
+
+      // Original image export code
+      if (!stageRef.current) {
+        throw new Error("Stage not available");
+      }
+
+      // Temporarily update grid visibility for image exports
+      if (options.includeGrid !== undefined) {
+        setShowGrid(options.includeGrid);
+      }
+
+      // Force a re-render to update the canvas
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Use the updated exportDiagram function with connections
+      const result = await exportDiagram(stageRef.current, droppedItems, {
+        ...options,
+        connections: connections,
+      });
+
+      // Use the filename from options with correct extension
+      let filename: string;
+
+      if (options.filename) {
+        // Ensure correct extension based on format
+        const extension =
+          options.format === "pdf"
+            ? ".pdf"
+            : options.format === "jpg"
+              ? ".jpg"
+              : ".png";
+
+        // Check if filename already has extension
+        const hasCorrectExtension = options.filename
+          .toLowerCase()
+          .endsWith(extension);
+
+        filename = hasCorrectExtension
+          ? options.filename
+          : `${options.filename}${extension}`;
+      } else {
+        // Default filename
+        const timestamp = new Date().toISOString().split("T")[0];
+
+        filename = `diagram-${timestamp}.${options.format}`;
+      }
+
+      downloadBlob(result as Blob, filename);
+      setShowExportModal(false);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert(`Export failed: ${(error as Error).message}`);
+    } finally {
+      // Always restore original grid state for image exports
+      if (options.format !== "export") {
+        setShowGrid(originalShowGrid);
+      }
+      setIsExporting(false);
+    }
+  };
+
+  // Handle save changes to localStorage
+  const handleSaveChanges = async () => {
+    if (!projectId || !currentState || !projectMetadata) {
+      alert("No project loaded");
+
+      return;
+    }
+
+    try {
+      // Convert the editor state to backend format (use your existing util)
+      const canvasState = convertToBackendFormat(
+        Number(projectId),
+        currentState.items,
+        currentState.connections,
+        currentState.sequenceCounter || 0,
+      );
+
+      // Prepare payload expected by backend update view
+      const payload = {
+        name: projectMetadata.name,
+        description: projectMetadata.description,
+        canvas_state: canvasState,
+        // optionally include viewport so backend can persist it
+        viewport: {
+          scale: stageScale,
+          position: stagePos,
+          gridSize,
+          showGrid,
+          snapToGrid,
+        },
+      };
+
+      // PUT to backend
+      const updated = await saveProjectCanvas(Number(projectId), payload);
+
+      // After successful save, update local "lastSavedState" tracking
+      const savedStateStr = JSON.stringify({
+        items: currentState.items,
+        connections: currentState.connections,
+      });
+
+      setLastSavedState(savedStateStr);
+      setHasUnsavedChanges(false);
+
+      // Optionally update project metadata from backend response
+      if (updated && updated.name) {
+        setProjectMetadata({
+          name: updated.name,
+          description: updated.description ?? null,
+        });
+      }
+
+      alert(`Project "${projectMetadata.name}" saved successfully!`);
+    } catch (error) {
+      console.error("Save failed:", error);
+      alert(`Save failed: ${(error as Error).message}`);
+    }
+  };
+
+  // Initialize lastSavedState only on first load
+  useEffect(() => {
+    if (!currentState || lastSavedState) return;
+
+    const handleSaveChanges = async () => {
+      if (!projectId || !currentState || !projectMetadata) {
+        alert("No project loaded");
+
+        return;
+      }
+
+      try {
+        // Convert editor state → backend format
+        const canvasState = convertToBackendFormat(
+          Number(projectId),
+          currentState.items,
+          currentState.connections,
+          currentState.sequenceCounter || 0,
+        );
+
+        // 🔒 TEMP SAFE FIX — FILTER INVALID ITEMS
+        const safeItems = (canvasState.items || []).filter(
+          (item: any) =>
+            typeof item.component_id === "number" && item.component_id > 0,
+        );
+
+        if (safeItems.length !== canvasState.items.length) {
+          console.warn(
+            "Dropped invalid canvas items before save:",
+            canvasState.items.filter(
+              (i: any) => !i.component_id || i.component_id <= 0,
+            ),
+          );
+        }
+
+        const safeCanvasState = {
+          ...canvasState,
+          items: safeItems,
+        };
+
+        // Prepare payload
+        const payload = {
+          name: projectMetadata.name,
+          description: projectMetadata.description,
+          canvas_state: safeCanvasState,
+          viewport: {
+            scale: stageScale,
+            position: stagePos,
+            gridSize,
+            showGrid,
+            snapToGrid,
+          },
+        };
+
+        // PUT to backend
+        const updated = await saveProjectCanvas(Number(projectId), payload);
+
+        // Update local save tracking
+        const savedStateStr = JSON.stringify({
+          items: currentState.items,
+          connections: currentState.connections,
+        });
+
+        setLastSavedState(savedStateStr);
+        setHasUnsavedChanges(false);
+
+        if (updated && updated.name) {
+          setProjectMetadata({
+            name: updated.name,
+            description: updated.description ?? null,
+          });
+        }
+
+        alert(`Project "${projectMetadata.name}" saved successfully!`);
+      } catch (error) {
+        console.error("Save failed:", error);
+        alert(`Save failed: ${(error as Error).message}`);
+      }
+    };
+
+    // Initialize on first load only (when lastSavedState is null)
+    const currentStateStr = JSON.stringify({
+      items: currentState.items,
+      connections: currentState.connections,
+    });
+
+    setLastSavedState(currentStateStr);
+  }, [currentState, lastSavedState]);
+  // Track changes to detect unsaved modifications
+  useEffect(() => {
+    if (!currentState || !lastSavedState) return;
+
+    const currentStateStr = JSON.stringify({
+      items: currentState.items,
+      connections: currentState.connections,
+    });
+
+    const changed = currentStateStr !== lastSavedState;
+
+    if (changed !== hasUnsavedChanges) {
+      setHasUnsavedChanges(changed);
+    }
+  }, [
+    currentState?.items,
+    currentState?.connections,
+    lastSavedState,
+    hasUnsavedChanges,
+  ]);
+
+  // Warn on browser refresh/close
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handler for save and proceed with navigation
+  const handleSaveAndNavigate = () => {
+    handleSaveChanges();
+    setHasUnsavedChanges(false);
+    navigate("/dashboard");
+  };
+
+  // Handler for discard and proceed with navigation
+  const handleDiscardAndNavigate = () => {
+    setHasUnsavedChanges(false);
+    navigate("/dashboard");
+  };
+
+  // Handler for new project button
+  const handleNewProjectClick = () => {
+    if (hasUnsavedChanges) {
+      setUnsavedContext("newProject");
+      setShowUnsavedModal(true);
+    } else {
+      setShowNewProjectModal(true);
+    }
+  };
+
+  // Handler for save and create new project
+  const handleSaveAndCreateNew = () => {
+    handleSaveChanges();
+    setHasUnsavedChanges(false);
+    setShowNewProjectModal(true);
+  };
+
+  // Handler for discard and create new project
+  const handleDiscardAndCreateNew = () => {
+    setHasUnsavedChanges(false);
+    setShowNewProjectModal(true);
+  };
+
+  // Handler for creating new project from modal
+  const handleCreateNewProject = async (name: string, description: string) => {
+    try {
+      const created = await createProject(name, description || null);
+
+      navigate(`/editor/${created.id}`);
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      alert("Failed to create project");
+    }
+  };
+
+  useEffect(() => {
+    if (showExportModal) {
+      // Clear all selections when export modal opens
+      setSelectedItemIds(new Set());
+      setSelectedConnectionIds(new Set());
+    }
+  }, [showExportModal]);
+
+  // --- State ---
+  const { components } = useComponents();
+  const handleZoomIn = () => {
+    setStageScale((prev) => Math.min(3, prev + 0.1));
+  };
+
+  const handleZoomOut = () => {
+    setStageScale((prev) => Math.max(0.1, prev - 0.1));
+  };
+
+  const handleToggleGrid = () => {
+    setShowGrid((prev) => !prev);
+  };
+
+  const handleCenterToContent = () => {
+    if (droppedItems.length === 0) {
+      setStagePos({ x: 0, y: 0 });
+      setStageScale(1);
+
+      return;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    droppedItems.forEach((item) => {
+      minX = Math.min(minX, item.x);
+      minY = Math.min(minY, item.y);
+      maxX = Math.max(maxX, item.x + item.width);
+      maxY = Math.max(maxY, item.y + item.height);
+    });
+
+    const padding = 100;
+    const contentWidth = maxX - minX + padding * 2;
+    const contentHeight = maxY - minY + padding * 2;
+
+    if (stageRef.current && containerRef.current) {
+      const containerWidth = stageSize.width;
+      const containerHeight = stageSize.height;
+
+      const scaleX = containerWidth / contentWidth;
+      const scaleY = containerHeight / contentHeight;
+      const scale = Math.min(scaleX, scaleY, 1);
+
+      const centerX = minX - padding + contentWidth / 2;
+      const centerY = minY - padding + contentHeight / 2;
+
+      const targetX = containerWidth / 2 - centerX * scale;
+      const targetY = containerHeight / 2 - centerY * scale;
+
+      setStageScale(scale);
+      setStagePos({ x: targetX, y: targetY });
+    }
+  };
+
+  // Selection state
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<
+    Set<number>
+  >(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  
+
+  // Connection drawing state
+  const [isDrawingConnection, setIsDrawingConnection] = useState(false);
+  const [tempConnection, setTempConnection] = useState<{
+    sourceItemId: number;
+    sourceGripIndex: number;
+    startX: number;
+    startY: number;
+    waypoints: { x: number; y: number }[];
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const [hoveredGrip, setHoveredGrip] = useState<{
+    itemId: number;
+    gripIndex: number;
+  } | null>(null);
+
   // Canvas Viewport State
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
   // Refs
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragItemRef = useRef<ComponentItem | null>(null);
 
-  useEffect(() => {
-    setComponents(componentsConfig);
-  }, []);
+  // --- Helpers ---
+  const connectionPaths = useMemo(
+    () => calculateManualPathsWithBridges(connections, droppedItems),
+    [connections, droppedItems],
+  );
 
-  const filteredComponents = Object.keys(components).reduce<Record<string, ComponentItem[]>>((result, category) => {
-    const items = components[category as keyof ComponentsConfig] as Record<string, ComponentItem>;
-    const matched = Object.keys(items).filter((key) =>
-      items[key].name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    if (matched.length > 0) {
-      result[category] = matched.map((key) => items[key]);
+  const handleCancelDrawing = () => {
+    if (isDrawingConnection) {
+      setIsDrawingConnection(false);
+      setTempConnection(null);
     }
+  };
 
-    return result;
-  }, {});
+  const snapToGridPosition = (x: number, y: number) => {
+    if (!snapToGrid) return { x, y };
+    const effectiveGridSize = gridSize;
 
+    return {
+      x: Math.round(x / effectiveGridSize) * effectiveGridSize,
+      y: Math.round(y / effectiveGridSize) * effectiveGridSize,
+    };
+  };
+
+  // --- Shortcuts ---
+  const shortcuts: Shortcut[] = useMemo(
+    () => [
+      {
+        key: "z",
+        label: "Undo",
+        display: "Ctrl + Z",
+        requireCtrl: true,
+        handler: () => projectId && editorStore.undo(projectId),
+      },
+      {
+        key: "a",
+        label: "Select All",
+        display: "Ctrl + A",
+        requireCtrl: true,
+        handler: () => {
+          // Select all items
+          const allItemIds = new Set(droppedItems.map((item) => item.id));
+
+          setSelectedItemIds(allItemIds);
+
+          // Select all connections
+          const allConnectionIds = new Set(connections.map((conn) => conn.id));
+
+          setSelectedConnectionIds(allConnectionIds);
+        },
+      },
+      {
+        key: "g",
+        label: "Toggle Grid",
+        display: "Ctrl+G",
+        requireCtrl: true,
+        handler: handleToggleGrid,
+      },
+      {
+        key: "h",
+        label: "Toggle Snap to Grid",
+        display: "Ctrl+h",
+        requireCtrl: true,
+        handler: () => setSnapToGrid((prev) => !prev),
+      },
+      {
+        key: "y",
+        label: "Redo",
+        display: "Ctrl + Y",
+        requireCtrl: true,
+        handler: () => projectId && editorStore.redo(projectId),
+      },
+      {
+        key: "c",
+        label: "Center to Content",
+        display: "Ctrl + C",
+        requireCtrl: true,
+        handler: handleCenterToContent,
+      },
+      {
+        key: "delete",
+        label: "Delete Selection",
+        display: "d / Del / Backspace",
+        requireCtrl: false,
+        handler: () => {
+          if (!projectId) return;
+
+          if (selectedConnectionIds.size > 0) {
+            editorStore.batchRemoveConnections(
+              projectId,
+              Array.from(selectedConnectionIds),
+            );
+            setSelectedConnectionIds(new Set());
+          }
+
+          if (selectedItemIds.size > 0) {
+            editorStore.batchDeleteItems(
+              projectId,
+              Array.from(selectedItemIds),
+            );
+            setSelectedItemIds(new Set());
+          }
+        },
+      },
+      {
+        key: "escape",
+        label: "Cancel Drawing",
+        display: "Esc",
+        requireCtrl: false,
+        handler: handleCancelDrawing,
+      },
+    ],
+    [
+      projectId,
+      editorStore,
+      selectedItemIds,
+      selectedConnectionIds,
+      snapToGrid,
+      droppedItems,
+      connections,
+    ],
+  );
+
+  // Handle keyboard events
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+
+      for (const shortcut of shortcuts) {
+        const matchesKey =
+          key === shortcut.key ||
+          (shortcut.key === "delete" &&
+            (key === "delete" || key === "backspace" || key === "d"));
+
+        if (matchesKey && (!shortcut.requireCtrl || isCtrlOrCmd(e))) {
+          e.preventDefault();
+          shortcut.handler();
+
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [shortcuts]);
+
+  // --- Handlers ---
   const handleDragStart = (e: React.DragEvent, item: ComponentItem) => {
     dragItemRef.current = item;
-    
-    // Set drag image (ghost)
+
     if (item.svg) {
       const img = new Image();
+
       img.src = item.svg;
-      // White background for drag preview
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
+
       canvas.width = 80;
       canvas.height = 80;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
+
       if (ctx) {
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, 80, 80);
         img.onload = () => {
           ctx.drawImage(img, 0, 0, 80, 80);
-          e.dataTransfer.setDragImage(canvas, 40, 40);
+          try {
+            e.dataTransfer.setDragImage(canvas, 40, 40);
+          } catch {
+            // ignore in unsupported environments
+          }
         };
       }
     }
@@ -85,25 +1036,63 @@ export default function Editor() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const stage = stageRef.current;
-    
-    // If we dropped a sidebar item
-    if (dragItemRef.current && stage) {
-      stage.setPointersPositions(e);
-      const pointer = stage.getRelativePointerPosition();
-      
+
+    if (dragItemRef.current && stage && projectId) {
+      try {
+        stage.setPointersPositions(e.nativeEvent);
+      } catch {
+        // fallback
+      }
+
+      const pointer = stage.getRelativePointerPosition?.();
+
       if (pointer) {
-        const newItem: CanvasItem = {
-          ...dragItemRef.current,
-          id: Date.now(),
-          x: pointer.x - 40, // Center based on 80px width
-          y: pointer.y - 40,
-          width: 80,
-          height: 80,
-          rotation: 0
+        const droppedItem = dragItemRef.current;
+        const img = new Image();
+
+        img.src = droppedItem.svg || droppedItem.icon || "";
+
+        const finalizeAdd = (width: number, height: number) => {
+          let x = pointer.x - width / 2;
+          let y = pointer.y - height / 2;
+
+          if (snapToGrid) {
+            const snapped = snapToGridPosition(x, y);
+
+            x = snapped.x;
+            y = snapped.y;
+          }
+
+          const newItem = editorStore.addItem(projectId, droppedItem, {
+            x,
+            y,
+            width,
+            height,
+            rotation: 0,
+          });
+
+          if (newItem) {
+            setSelectedItemIds(new Set([newItem.id]));
+          }
         };
-        
-        setDroppedItems(prev => [...prev, newItem]);
-        setSelectedItemId(newItem.id);
+
+        img.onload = () => {
+          const aspectRatio = img.width / img.height;
+          // Use the dynamic component size from slider
+          const targetArea = componentSize;
+          let width: number;
+          let height: number;
+
+          // Calculate dimensions to match target area while maintaining aspect ratio
+          height = Math.sqrt(targetArea / aspectRatio);
+          width = height * aspectRatio;
+
+          finalizeAdd(width, height);
+        };
+
+        img.onerror = () => {
+          finalizeAdd(80, 80);
+        };
       }
       dragItemRef.current = null;
     }
@@ -112,10 +1101,10 @@ export default function Editor() {
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
+
     if (!stage) return;
 
     if (e.evt.ctrlKey) {
-      // Zoom logic
       const scaleBy = 1.05;
       const oldScale = stage.scaleX();
       const pointer = stage.getPointerPosition();
@@ -127,7 +1116,8 @@ export default function Editor() {
         y: (pointer.y - stage.y()) / oldScale,
       };
 
-      const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+      const newScale =
+        e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
 
       setStageScale(newScale);
       setStagePos({
@@ -135,71 +1125,337 @@ export default function Editor() {
         y: pointer.y - mousePointTo.y * newScale,
       });
     } else {
-      // Pan logic
-      setStagePos(prev => ({
+      setStagePos((prev: { x: number; y: number }) => ({
         x: prev.x - e.evt.deltaX,
-        y: prev.y - e.evt.deltaY
+        y: prev.y - e.evt.deltaY,
       }));
     }
   };
 
   const handleDeleteItem = (itemId: number) => {
-    setDroppedItems(prev => prev.filter(item => item.id !== itemId));
-    if (selectedItemId === itemId) {
-      setSelectedItemId(null);
-    }
+    if (!projectId) return;
+
+    editorStore.deleteItem(projectId, itemId);
+    setSelectedItemIds((prev: Set<number>) => {
+      const next = new Set(prev);
+
+      next.delete(itemId);
+
+      return next;
+    });
   };
 
   const handleUpdateItem = (itemId: number, updates: Partial<CanvasItem>) => {
-    setDroppedItems(prev => 
-      prev.map(item => 
-        item.id === itemId ? { ...item, ...updates } : item
-      )
-    );
+    if (!projectId) return;
+
+    let snappedUpdates: Partial<CanvasItem> = { ...updates };
+
+    if (snapToGrid && (updates.x !== undefined || updates.y !== undefined)) {
+      const currentItem = droppedItems.find((i) => i.id === itemId);
+
+      if (currentItem) {
+        const x = updates.x ?? currentItem.x;
+        const y = updates.y ?? currentItem.y;
+        const snapped = snapToGridPosition(x, y);
+
+        if (updates.x !== undefined) snappedUpdates.x = snapped.x;
+        if (updates.y !== undefined) snappedUpdates.y = snapped.y;
+      }
+    }
+
+    // Multi-drag support
+    if (
+      selectedItemIds.has(itemId) &&
+      (snappedUpdates.x !== undefined || snappedUpdates.y !== undefined)
+    ) {
+      const currentItem = droppedItems.find((i) => i.id === itemId);
+
+      if (currentItem) {
+        const deltaX = (snappedUpdates.x ?? currentItem.x) - currentItem.x;
+        const deltaY = (snappedUpdates.y ?? currentItem.y) - currentItem.y;
+
+        if (deltaX !== 0 || deltaY !== 0) {
+          const batchUpdates = droppedItems
+            .filter((item) => selectedItemIds.has(item.id))
+            .map((item) => ({
+              id: item.id,
+              patch: {
+                x: snapToGrid
+                  ? snapToGridPosition(item.x + deltaX, item.y + deltaY).x
+                  : item.x + deltaX,
+                y: snapToGrid
+                  ? snapToGridPosition(item.x + deltaX, item.y + deltaY).y
+                  : item.y + deltaY,
+              },
+            }));
+
+          editorStore.batchUpdateItems(projectId, batchUpdates);
+
+          return;
+        }
+      }
+    }
+
+    // Single item update
+    editorStore.updateItem(projectId, itemId, snappedUpdates);
   };
 
-  const handleSelectItem = (itemId: number) => {
-    setSelectedItemId(itemId);
+  const handleSelectItem = (
+    itemId: number,
+    e?: Konva.KonvaEventObject<MouseEvent>,
+  ) => {
+    const isCtrl = e?.evt.ctrlKey || e?.evt.metaKey;
+
+    setSelectedItemIds((prev) => {
+      const next = new Set(isCtrl ? prev : []);
+
+      if (isCtrl && prev.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+
+      return next;
+    });
+
+    if (!isCtrl) {
+      setSelectedConnectionIds(new Set());
+    }
   };
 
   const handleClearSelection = () => {
-    setSelectedItemId(null);
+    setSelectedItemIds(new Set());
+    setSelectedConnectionIds(new Set());
   };
+
+  // Connection Handlers
+  const handleGripMouseDown = (
+    itemId: number,
+    gripIndex: number,
+    x: number,
+    y: number,
+  ) => {
+    if (!projectId) return;
+
+    if (
+      isDrawingConnection &&
+      tempConnection &&
+      (tempConnection.sourceItemId !== itemId ||
+        tempConnection.sourceGripIndex !== gripIndex)
+    ) {
+      const newConnection = editorStore.addConnection(projectId, {
+        sourceItemId: tempConnection.sourceItemId,
+        sourceGripIndex: tempConnection.sourceGripIndex,
+        targetItemId: itemId,
+        targetGripIndex: gripIndex,
+        waypoints: tempConnection.waypoints,
+      });
+
+      setIsDrawingConnection(false);
+      setTempConnection(null);
+      setSelectedConnectionIds(new Set([newConnection.id]));
+
+      return;
+    }
+
+    setIsDrawingConnection(true);
+    setTempConnection({
+      sourceItemId: itemId,
+      sourceGripIndex: gripIndex,
+      startX: x,
+      startY: y,
+      waypoints: [],
+      currentX: x,
+      currentY: y,
+    });
+  };
+
+  const handleGripMouseEnter = (itemId: number, gripIndex: number) => {
+    setHoveredGrip({ itemId, gripIndex });
+  };
+
+  const handleGripMouseLeave = () => {
+    setHoveredGrip(null);
+  };
+
+  const handleStageMouseMove = () => {
+    if (isDrawingConnection && tempConnection) {
+      const stage = stageRef.current;
+
+      if (stage) {
+        const pointer = stage.getRelativePointerPosition();
+
+        if (pointer) {
+          setTempConnection((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  currentX: pointer.x,
+                  currentY: pointer.y,
+                }
+              : null,
+          );
+        }
+      }
+    }
+  };
+
+  const handleStageMouseUp = () => {
+    // Manual connection drawing - no auto-cancel
+  };
+
+  // Handle stage resize
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const rect = entries[0].contentRect;
+
+      setStageSize({
+        width: rect.width,
+        height: rect.height,
+      });
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Undo/Redo handlers
+  const handleUndo = () => {
+    if (projectId && canUndo) {
+      editorStore.undo(projectId);
+    }
+  };
+
+  const handleRedo = () => {
+    if (projectId && canRedo) {
+      editorStore.redo(projectId);
+    }
+  };
+
+  // Grid Layer Component
+  const GridLayer = React.memo(
+    ({
+      width,
+      height,
+      gridSize,
+      showGrid,
+    }: {
+      width: number;
+      height: number;
+      gridSize: number;
+      showGrid: boolean;
+    }) => {
+      if (!showGrid) return null;
+
+      return (
+        <Layer listening={false}>
+          <Shape
+            opacity={0.3}
+            perfectDrawEnabled={false}
+            sceneFunc={(context: any, shape: Konva.Shape) => {
+              context.beginPath();
+
+              const startX = -5000;
+              const endX = width + 5000;
+              const startY = -5000;
+              const endY = height + 5000;
+
+              // Vertical Lines
+              for (let x = startX; x <= endX; x += gridSize) {
+                context.moveTo(x, startY);
+                context.lineTo(x, endY);
+              }
+
+              // Horizontal Lines
+              for (let y = startY; y <= endY; y += gridSize) {
+                context.moveTo(startX, y);
+                context.lineTo(endX, y);
+              }
+
+              context.fillStrokeShape(shape);
+            }}
+            stroke="#9ca3af"
+            strokeWidth={1}
+          />
+        </Layer>
+      );
+    },
+  );
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Header Bar - Preserved */}
-      <div className="h-14 border-b flex items-center px-4 justify-between bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 z-10">
+      {/* Header Bar */}
+      <div className="h-14 shrink-0 border-b flex items-center px-4 justify-between bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 z-10">
         <div className="flex items-center gap-2">
           <Tooltip content="Back to Dashboard">
-            <Button 
-              isIconOnly 
-              variant="light" 
-              onPress={() => navigate("/dashboard")}
+            <Button
+              isIconOnly
               className="text-gray-700 dark:text-gray-300"
-            >←</Button>
+              variant="light"
+              onPress={() => {
+                if (hasUnsavedChanges) {
+                  setUnsavedContext("navigation");
+                  setShowUnsavedModal(true);
+                } else {
+                  navigate("/dashboard");
+                }
+              }}
+            >
+              ←
+            </Button>
           </Tooltip>
           <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2" />
-          <Dropdown>
-            <DropdownTrigger>
-              <Button variant="light" size="sm" className="text-gray-700 dark:text-gray-300">File</Button>
-            </DropdownTrigger>
-            <DropdownMenu aria-label="File Actions">
-              <DropdownItem key="new">New Diagram</DropdownItem>
-              <DropdownItem key="save">Save Project (Ctrl+S)</DropdownItem>
-              <DropdownItem key="export">Export as PDF</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
 
           <Dropdown>
             <DropdownTrigger>
-              <Button variant="light" size="sm" className="text-gray-700 dark:text-gray-300">Edit</Button>
+              <Button
+                className="text-gray-700 dark:text-gray-300"
+                size="sm"
+                variant="light"
+              >
+                Edit
+              </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="Edit Actions">
-              <DropdownItem key="undo">Undo (Ctrl+Z)</DropdownItem>
-              <DropdownItem key="redo">Redo (Ctrl+Y)</DropdownItem>
-              <DropdownItem key="delete" onPress={() => selectedItemId && handleDeleteItem(selectedItemId)}>
-                Delete Selected (Del)
+            <DropdownMenu
+              aria-label="Edit Actions"
+              disabledKeys={
+                [!canUndo && "undo", !canRedo && "redo"].filter(
+                  Boolean,
+                ) as string[]
+              }
+            >
+              <DropdownItem key="undo" onPress={handleUndo}>
+                Undo (Ctrl+Z)
+              </DropdownItem>
+              <DropdownItem key="redo" onPress={handleRedo}>
+                Redo (Ctrl+Y)
+              </DropdownItem>
+              <DropdownItem
+                key="delete"
+                onPress={() => {
+                  if (
+                    selectedItemIds.size > 0 ||
+                    selectedConnectionIds.size > 0
+                  ) {
+                    if (projectId && selectedItemIds.size > 0)
+                      editorStore.batchDeleteItems(
+                        projectId,
+                        Array.from(selectedItemIds),
+                      );
+                    if (projectId && selectedConnectionIds.size > 0)
+                      editorStore.batchRemoveConnections(
+                        projectId,
+                        Array.from(selectedConnectionIds),
+                      );
+                    setSelectedItemIds(new Set());
+                    setSelectedConnectionIds(new Set());
+                  }
+                }}
+              >
+                Delete Selected (d)
               </DropdownItem>
               <DropdownItem key="clear" onPress={handleClearSelection}>
                 Clear Selection
@@ -209,226 +1465,641 @@ export default function Editor() {
 
           <Dropdown>
             <DropdownTrigger>
-              <Button variant="light" size="sm" className="text-gray-700 dark:text-gray-300">View</Button>
+              <Button
+                className="text-gray-700 dark:text-gray-300"
+                size="sm"
+                variant="light"
+              >
+                View
+              </Button>
             </DropdownTrigger>
             <DropdownMenu aria-label="View Actions">
-              <DropdownItem key="zoom-in">Zoom In (+)</DropdownItem>
-              <DropdownItem key="zoom-out">Zoom Out (-)</DropdownItem>
-              <DropdownItem key="fit">Fit to Screen</DropdownItem>
-              <DropdownItem key="grid">Toggle Grid</DropdownItem>
+              <DropdownItem key="zoom-in" onPress={handleZoomIn}>
+                Zoom In (+)
+              </DropdownItem>
+              <DropdownItem key="zoom-out" onPress={handleZoomOut}>
+                Zoom Out (-)
+              </DropdownItem>
+              <DropdownItem key="fit" onPress={handleCenterToContent}>
+                Fit to Screen
+              </DropdownItem>
+              <DropdownItem key="grid" onPress={handleToggleGrid}>
+                {showGrid ? "Hide Grid" : "Show Grid"}
+              </DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
 
         <div className="font-semibold text-gray-800 dark:text-gray-200">
-          Diagram Editor <span className="text-xs ml-2 text-gray-600 dark:text-gray-400">ID: {projectId}</span>
+          Diagram Editor{" "}
+          <span className="text-xs ml-2 text-gray-600 dark:text-gray-400">
+            ID: {projectId}
+          </span>
         </div>
 
         <div className="flex gap-2">
           <ThemeSwitch />
-          <Button size="sm" variant="bordered" className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300">
-            Share
+          <Button
+            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+            size="sm"
+            variant="bordered"
+            onPress={handleNewProjectClick}
+          >
+            New Project
           </Button>
-          <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700">Save Changes</Button>
+          <Button
+            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+            isLoading={isImporting}
+            size="sm"
+            startContent={<TbFileImport />}
+            variant="bordered"
+            onPress={() => {
+              // Create a hidden file input
+              const input = document.createElement("input");
+
+              input.type = "file";
+              input.accept = ".pfd";
+              input.onchange = (e) => handleImportDiagram(e as any);
+              input.click();
+            }}
+          >
+            Import
+          </Button>
+          <Button
+            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+            size="sm"
+            startContent={<FiDownload />}
+            variant="bordered"
+            onPress={() => setShowExportModal(true)}
+          >
+            Export
+          </Button>
+          <Button
+            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+            size="sm"
+            startContent={<FiDownload />}
+            variant="bordered"
+            onPress={() => setShowReportModal(true)}
+          >
+            Generate Report
+          </Button>
+
+          <Button
+            className="bg-blue-600 text-white hover:bg-blue-700"
+            isDisabled={!projectId}
+            size="sm"
+            onPress={() => setShowSaveModal(true)}
+          >
+            Save Changes
+          </Button>
         </div>
       </div>
 
       {/* Main workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Component library sidebar - dark theme enabled */}
-        <div className="w-64 border-r flex flex-col bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          {/* Header with search */}
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-sm flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                Components Library
-                <span className="text-xs font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                  {Object.keys(components).reduce((acc, cat) => acc + Object.keys(components[cat as keyof ComponentsConfig] as Record<string, ComponentItem>).length, 0)} items
-                </span>
-              </h3>
-            </div>
-            
-            {/* Search Bar */}
-            <div className="relative mb-3">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <SearchIcon className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search components..."
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400"
-                onChange={(e) => setSearchQuery(e.target.value)}
-                value={searchQuery}
-              />
-            </div>
-            
-            {/* Quick filters */}
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              <button className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded whitespace-nowrap">
-                All
-              </button>
-              <button className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded whitespace-nowrap">
-                Frequently Used
-              </button>
-              <button className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded whitespace-nowrap">
-                Recent
-              </button>
-            </div>
-          </div>
-          
-        {/* Component List */}
-<div className="flex-1 overflow-y-auto">
-  {Object.keys(filteredComponents).map((category) => (
-    <div key={category} className="mb-6 first:mt-4">
-      <div className="px-4 mb-2 flex items-center justify-between group">
-        <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">{category}</h4>
-        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-          {Object.keys(components[category as keyof ComponentsConfig] as Record<string, ComponentItem>).length}
-        </span>
-      </div>
-      <div className="px-2">
-        <div className="grid grid-cols-2 gap-2">
-          {filteredComponents[category].map((item) => {
-            return (
-              <div
-                key={item.name}
-                className="p-2 border rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 cursor-move flex flex-col items-center transition-colors duration-150 group/item bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-                draggable
-                onDragStart={(e) => handleDragStart(e, item)}
-                title={`Drag to canvas: ${item.name}`}
-              >
-                <div className="relative">
-                  <div className="w-10 h-10 mb-1 bg-white rounded flex items-center justify-center p-1 border border-gray-100 dark:border-gray-600 group-hover/item:border-blue-200 dark:group-hover/item:border-blue-700">
-                    <img 
-                      src={item.icon} 
-                      alt={item.name}
-                      className="w-8 h-8 object-contain group-hover/item:scale-105 transition-transform duration-150"
-                    />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full text-white text-[10px] flex items-center justify-center hidden group-hover/item:flex">
-                    +
-                  </div>
-                </div>
-                <span className="text-xs text-center line-clamp-2 text-gray-700 dark:text-gray-300 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400">
-                  {item.name}
-                </span>
-              </div>
-            );
-          })}
+      <div
+        className="flex-1 grid overflow-hidden transition-all duration-300"
+        style={{
+          gridTemplateColumns: `
+            ${leftCollapsed ? "48px" : "256px"}
+            minmax(0, 1fr)
+            ${rightCollapsed ? "48px" : "288px"}
+          `,
+        }}
+      >
+        {/* Left Sidebar - Component Library */}
+        <div className="relative overflow-hidden border-r border-gray-200 dark:border-gray-800">
+          {!leftCollapsed && (
+            <ComponentLibrarySidebar
+              components={components}
+              initialSearchQuery={searchQuery}
+              onDragStart={handleDragStart}
+              onSearch={setSearchQuery}
+            />
+          )}
         </div>
-      </div>
-    </div>
-  ))}
-</div>
-        </div>
-        
+
+        {/* Canvas Area - Konva */}
         {/* Canvas Area - Konva */}
         <div
-          className="flex-1 relative overflow-hidden bg-white"
           ref={containerRef}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
+          className="relative min-w-0 overflow-hidden bg-white"
+          onDragLeave={(e) => {
+            e.preventDefault();
+          }}
+          onDragOver={(e) => {
+            e.preventDefault(); // Allow drop
+            // Also handle file drags
+            if (e.dataTransfer.types.includes("Files")) {
+              e.dataTransfer.dropEffect = "copy";
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+
+            // First check if it's a file drop (for .export files)
+            if (e.dataTransfer.files.length > 0) {
+              const file = e.dataTransfer.files[0];
+
+              if (file.name.endsWith(".export")) {
+                // Create a synthetic event for handleImportDiagram
+                const syntheticEvent = {
+                  target: {
+                    files: [file],
+                  },
+                } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+                handleImportDiagram(syntheticEvent);
+
+                return;
+              }
+            }
+
+            // Otherwise, it's a component drag from the sidebar
+            handleDrop(e);
+          }}
         >
-          {/* CSS Grid Background */}
-          <div 
-            className="absolute inset-0 pointer-events-none" 
-            style={{ 
-              backgroundImage: 'radial-gradient(#9ca3af 1px, transparent 1px)', 
-              backgroundSize: `${20 * stageScale}px ${20 * stageScale}px`,
-              backgroundPosition: `${stagePos.x}px ${stagePos.y}px`,
-              opacity: 0.3
-            }} 
-          />
-          
+          <FileDropZone />
+
+          {/* Left Sidebar Collapse Button */}
+          <button
+            className="absolute top-1/2 -translate-y-1/2 left-2 z-30 w-8 h-16 flex items-center justify-center
+            rounded-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900
+            border border-gray-300/50 dark:border-gray-600/50
+            shadow-lg hover:shadow-xl
+            hover:scale-105 active:scale-95
+            transition-all duration-200 ease-out
+            hover:border-blue-400/50 dark:hover:border-blue-500/50
+            group pointer-events-auto"
+            title={leftCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onClick={() => setLeftCollapsed((v) => !v)}
+          >
+            {!leftCollapsed ? (
+              <TbLayoutSidebarLeftCollapse className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            ) : (
+              <TbLayoutSidebarLeftExpand className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            )}
+          </button>
+
+          {/* Right Sidebar Collapse Button */}
+          <button
+            className="absolute top-1/2 -translate-y-1/2 right-2 z-30 w-8 h-16 flex items-center justify-center
+            rounded-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900
+            border border-gray-300/50 dark:border-gray-600/50
+            shadow-lg hover:shadow-xl
+            hover:scale-105 active:scale-95
+            transition-all duration-200 ease-out
+            hover:border-blue-400/50 dark:hover:border-blue-500/50
+            group pointer-events-auto"
+            title={rightCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onClick={() => setRightCollapsed((v: boolean) => !v)}
+          >
+            {!rightCollapsed ? (
+              <TbLayoutSidebarRightCollapse className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            ) : (
+              <TbLayoutSidebarRightExpand className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            )}
+          </button>
+
           <Stage
-            width={window.innerWidth - (64 + 72 + 16)} // 64(left) + 72(right) + 16(padding)
-            height={window.innerHeight - 56}
+            ref={stageRef}
+            draggable
+            className="flex relative"
+            height={stageSize.height}
             scaleX={stageScale}
             scaleY={stageScale}
+            width={stageSize.width}
             x={stagePos.x}
             y={stagePos.y}
-            draggable
-            onWheel={handleWheel}
-            ref={stageRef}
+            onDragEnd={(e) => {
+              if (e.target === stageRef.current) {
+                setStagePos({ x: e.target.x(), y: e.target.y() });
+              }
+            }}
             onMouseDown={(e) => {
-              // Click on stage deselects
               const clickedOnEmpty = e.target === e.target.getStage();
+
+              if (clickedOnEmpty && isDrawingConnection && tempConnection) {
+                const stage = stageRef.current;
+
+                if (stage) {
+                  const pointer = stage.getRelativePointerPosition();
+
+                  if (pointer) {
+                    setTempConnection((prev: any) =>
+                      prev
+                        ? {
+                            ...prev,
+                            waypoints: [
+                              ...prev.waypoints,
+                              { x: pointer.x, y: pointer.y },
+                            ],
+                          }
+                        : prev,
+                    );
+                  }
+                }
+
+                return;
+              }
+
               if (clickedOnEmpty) {
                 handleClearSelection();
               }
             }}
             onMouseMove={() => {
               const stage = stageRef.current;
+
               if (stage) {
                 const pointer = stage.getRelativePointerPosition();
-                if(pointer) setCursorPos({ x: Math.round(pointer.x), y: Math.round(pointer.y) });
+
+                if (pointer)
+                  setCursorPos({
+                    x: Math.round(pointer.x),
+                    y: Math.round(pointer.y),
+                  });
               }
+              handleStageMouseMove();
             }}
-            onDragEnd={(e) => {
-               // Update stage position state when panning finishes
-               if(e.target === stageRef.current) {
-                   setStagePos({ x: e.target.x(), y: e.target.y() });
-               }
-            }}
+            onMouseUp={handleStageMouseUp}
+            onWheel={handleWheel}
           >
+            <GridLayer
+              gridSize={gridSize}
+              height={stageSize.height}
+              showGrid={showGrid}
+              width={stageSize.width}
+            />
             <Layer>
-              {droppedItems.map((item) => (
+              {/* Render Connections */}
+              {connections.map((connection: Connection) => (
+                <ConnectionLine
+                  key={connection.id}
+                  arrowAngle={connectionPaths[connection.id]?.arrowAngle}
+                  connection={connection}
+                  isSelected={selectedConnectionIds.has(connection.id)}
+                  items={droppedItems}
+                  pathData={connectionPaths[connection.id]?.pathData}
+                  points={[]}
+                  targetPosition={connectionPaths[connection.id]?.endPoint}
+                  onSelect={(e: Konva.KonvaEventObject<MouseEvent>) => {
+                    const isCtrl = e?.evt.ctrlKey || e?.evt.metaKey;
+
+                    setSelectedConnectionIds((prev: Set<number>) => {
+                      const next = new Set(isCtrl ? prev : []);
+
+                      if (isCtrl && prev.has(connection.id)) {
+                        next.delete(connection.id);
+                      } else {
+                        next.add(connection.id);
+                      }
+
+                      return next;
+                    });
+                    if (!isCtrl) setSelectedItemIds(new Set());
+                  }}
+                />
+              ))}
+
+              {/* Render Temporary Connection Line (Drawing) */}
+              {tempConnection && (
+                <Line
+                  dash={[10, 5]}
+                  listening={false}
+                  points={[
+                    tempConnection.startX,
+                    tempConnection.startY,
+                    ...tempConnection.waypoints.flatMap((p) => [p.x, p.y]),
+                    tempConnection.currentX,
+                    tempConnection.currentY,
+                  ]}
+                  stroke="#9ca3af"
+                  strokeWidth={2}
+                />
+              )}
+
+              {/* Render Components */}
+              {droppedItems.map((item: CanvasItem) => (
                 <CanvasItemImage
                   key={item.id}
+                  hoveredGrip={hoveredGrip}
+                  isDrawingConnection={isDrawingConnection}
+                  isSelected={selectedItemIds.has(item.id)}
                   item={item}
-                  isSelected={item.id === selectedItemId}
-                  onSelect={() => handleSelectItem(item.id)}
-                  onChange={(newAttrs) => {
-                    setDroppedItems(prev => 
-                      prev.map(i => i.id === newAttrs.id ? newAttrs : i)
-                    );
-                  }}
+                  onChange={(newAttrs) =>
+                    handleUpdateItem(newAttrs.id, newAttrs)
+                  }
+                  onGripMouseDown={handleGripMouseDown}
+                  onGripMouseEnter={handleGripMouseEnter}
+                  onGripMouseLeave={handleGripMouseLeave}
+                  onSelect={(e) => handleSelectItem(item.id, e)}
                 />
               ))}
             </Layer>
           </Stage>
 
-          {/* Independent Floating Bubble */}
-          <div className="absolute bottom-6 right-[45%] flex flex-col items-end gap-2 pointer-events-none">
-             {/* Coordinate Bubble */}
-             <div className="flex items-center gap-3 px-4 py-2 bg-white/90 dark:bg-[#1f2938]  backdrop-blur shadow-lg border border-gray-200 rounded-full text-xs font-mono text-gray-600 pointer-events-auto">
-                <div className="flex gap-2 dark:text-gray-200">
-                    <span className="font-bold text-gray-400">X</span> {cursorPos.x}
-                </div>
-                <div className="w-px h-3 bg-gray-400"></div>
-                <div className="flex gap-2 dark:text-gray-200">
-                    <span className="font-bold text-gray-400">Y</span> {cursorPos.y}
-                </div>
-                <div className="w-px h-3 bg-gray-300"></div>
-                <div className="font-semibold text-blue-600">
-                    {Math.round(stageScale * 100)}%
-                </div>
-             </div>
+          {/* Floating Info Bubble */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none">
+            <div className="flex items-center gap-3 px-4 py-2 bg-white/90 dark:bg-[#1f2938] backdrop-blur shadow-lg border border-gray-200 rounded-full text-xs font-mono text-gray-600 pointer-events-auto">
+              {/* XY Coordinates */}
+              <div className="flex gap-2 dark:text-gray-200">
+                <span className="font-bold text-gray-400">X</span> {cursorPos.x}
+              </div>
+              <div className="w-px h-3 bg-gray-400" />
+              <div className="flex gap-2 dark:text-gray-200">
+                <span className="font-bold text-gray-400">Y</span> {cursorPos.y}
+              </div>
 
-             {/* Help Bubble */}
-             
+              <div className="w-px h-3 bg-gray-300" />
+
+              <div className="flex items-center gap-3">
+                {/* Show Grid Button */}
+                <Tooltip
+                  content={showGrid ? "Hide Grid" : "Show Grid"}
+                  placement="top"
+                >
+                  <button
+                    aria-label="Toggle Grid Visibility"
+                    className={`w-8 h-8 flex items-center justify-center rounded-md 
+        border border-gray-300 dark:border-gray-700 
+        bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 
+        transition-all duration-150`}
+                    onClick={() => setShowGrid((prev) => !prev)}
+                  >
+                    {showGrid ? (
+                      <TbGridDots className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                    ) : (
+                      <TbGridPattern className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                    )}
+                  </button>
+                </Tooltip>
+
+                {/* Snap to Grid Switch */}
+                <Tooltip
+                  content={snapToGrid ? "Snap Enabled" : "Snap Disabled"}
+                  placement="top"
+                >
+                  <Switch
+                    aria-label="Snap to Grid"
+                    color="primary"
+                    isSelected={snapToGrid}
+                    size="sm"
+                    thumbIcon={({ isSelected, className }) =>
+                      isSelected ? (
+                        <TbGridDots className={className} />
+                      ) : (
+                        <TbGridPattern className={className} />
+                      )
+                    }
+                    onValueChange={setSnapToGrid}
+                  />
+                </Tooltip>
+              </div>
+
+              <div className="w-px h-3 bg-gray-300" />
+
+              {/* Component Size Slider */}
+              <div className="flex items-center gap-2">
+                <Tooltip content="Component Size" placement="top">
+                  <div className="flex items-center gap-2 px-2">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      Size
+                    </span>
+                    <Slider
+                      aria-label="Component Size"
+                      className="w-24"
+                      classNames={{
+                        track:
+                          "bg-gradient-to-r from-blue-200 to-blue-400 dark:from-blue-800 dark:to-blue-600",
+                        thumb: "bg-blue-600 dark:bg-blue-500",
+                      }}
+                      maxValue={3000}
+                      minValue={1000}
+                      size="sm"
+                      step={100}
+                      value={componentSize}
+                      onChange={(value) => setComponentSize(value as number)}
+                    />
+                  </div>
+                </Tooltip>
+              </div>
+
+              <div className="w-px h-3 bg-gray-300" />
+
+              {/* Zoom Controls */}
+              <div className="flex items-center gap-2">
+                {/* Zoom Out Button */}
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-full
+                bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700
+                border border-gray-300 dark:border-gray-600
+                shadow-sm hover:shadow
+                disabled:opacity-40 disabled:cursor-not-allowed
+                transition-all duration-200"
+                  disabled={stageScale <= 0.1}
+                  title="Zoom Out"
+                  onClick={handleZoomOut}
+                >
+                  <MdZoomOut className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                </button>
+
+                {/* Zoom Percentage Display */}
+                <div className="flex items-center">
+                  <div
+                    className="px-3 py-1.5 text-sm font-medium
+                bg-gray-50 dark:bg-gray-800 
+                rounded-l-md
+                text-gray-700 dark:text-gray-300"
+                  >
+                    {Math.round(stageScale * 100)}%
+                  </div>
+                </div>
+
+                {/* Center Content Button */}
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-full
+                bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700
+                border border-gray-300 dark:border-gray-600
+                shadow-sm hover:shadow
+                disabled:opacity-40 disabled:cursor-not-allowed
+                transition-all duration-200"
+                  disabled={droppedItems.length === 0}
+                  title="Center to Content"
+                  onClick={handleCenterToContent}
+                >
+                  <MdCenterFocusWeak className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                </button>
+
+                {/* Zoom In Button */}
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-full
+                bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700
+                border border-gray-300 dark:border-gray-600
+                shadow-sm hover:shadow
+                disabled:opacity-40 disabled:cursor-not-allowed
+                transition-all duration-200"
+                  disabled={stageScale >= 3}
+                  title="Zoom In"
+                  onClick={handleZoomIn}
+                >
+                  <MdZoomIn className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                </button>
+              </div>
+            </div>
           </div>
-          
+          {/* Canvas Shortcuts Help */}
+          <div className="absolute bottom-6 right-6 z-20">
+            <Popover showArrow offset={8} placement="top-end">
+              <PopoverTrigger>
+                <Button
+                  isIconOnly
+                  className="rounded-ful bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  size="sm"
+                  variant="bordered"
+                >
+                  ?
+                </Button>
+              </PopoverTrigger>
+
+              <PopoverContent className="w-64">
+                <div className="p-3 space-y-2">
+                  <div className="text-sm font-semibold text-foreground">
+                    Keyboard Shortcuts
+                  </div>
+
+                  <div className="space-y-1">
+                    {shortcuts.map((s) => (
+                      <div
+                        key={s.label}
+                        className="flex justify-between items-center text-xs"
+                      >
+                        <span className="text-foreground/70">{s.label}</span>
+                        <span className="font-mono bg-content2 px-2 py-0.5 rounded">
+                          {s.display}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 text-[10px] text-foreground/50">
+                    Ctrl (Windows/Linux) or Cmd (Mac)
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Connection Guidance Overlay */}
+          {isDrawingConnection && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
+              <div className="px-4 py-2 bg-black/70 backdrop-blur text-white text-sm rounded-full shadow-lg border border-white/10 flex items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  Drawing Connection
+                </span>
+                <div className="w-px h-3 bg-white/20" />
+                <span className="text-white/80 text-xs">
+                  Click empty space to add corner • Click target point to finish
+                  • Press Esc to cancel
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Selection Guidance Overlay */}
+          {!isDrawingConnection &&
+            (selectedItemIds.size > 0 || selectedConnectionIds.size > 0) && (
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
+                <div className="px-4 py-2 bg-black/70 backdrop-blur text-white text-sm rounded-full shadow-lg border border-white/10 flex items-center gap-3">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                    {selectedItemIds.size + selectedConnectionIds.size} Selected
+                  </span>
+                  <div className="w-px h-3 bg-white/20" />
+                  <span className="text-white/80 text-xs">
+                    Press 'd' to delete selection • Ctrl+Click to add more
+                  </span>
+                </div>
+              </div>
+            )}
+
           {/* Empty State Overlay */}
           {droppedItems.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center p-6 bg-white/80 backdrop-blur rounded-xl border border-gray-200 shadow-sm">
-                <div className="text-gray-500 font-medium">Canvas Empty</div>
-                <div className="text-xs text-gray-400 mt-1">Drag components from the sidebar</div>
+              <div className="text-center p-6 bg-white/20 backdrop-blur rounded-xl border border-gray-200 shadow-sm">
+                <div className="text-black font-medium">Canvas Empty</div>
+                <div className="text-sm text-gray-400 mt-1">
+                  Drag components from the sidebar <br />
+                  <span className="font-bold">or</span> drag and drop a .pfd
+                  file started.
+                </div>
               </div>
             </div>
           )}
         </div>
-
         {/* Right Sidebar - Canvas Properties/Items List */}
-        <CanvasPropertiesSidebar
-          items={droppedItems}
-          selectedItemId={selectedItemId}
-          onSelectItem={handleSelectItem}
-          onDeleteItem={handleDeleteItem}
-          onUpdateItem={handleUpdateItem}
-          className="hidden lg:flex"
-          showAllItemsByDefault={true}
+        <div className="relative overflow-hidden border-l border-gray-200 dark:border-gray-800 hidden lg:block">
+          {!rightCollapsed && (
+            <CanvasPropertiesSidebar
+              showAllItemsByDefault
+              items={droppedItems}
+              selectedItemId={
+                selectedItemIds.size === 1
+                  ? Array.from(selectedItemIds)[0]
+                  : null
+              }
+              onDeleteItem={handleDeleteItem}
+              onSelectItem={(id: number) => setSelectedItemIds(new Set([id]))}
+              onUpdateItem={handleUpdateItem}
+            />
+          )}
+        </div>
+        <ExportModal
+          isExporting={isExporting}
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          onExport={handleExport}
+        />
+
+        <ExportReportModal
+          editorId={projectId ?? ""}
+          open={showReportModal}
+          onClose={() => setShowReportModal(false)}
+        />
+
+        {/* Save Confirmation Modal */}
+        <SaveConfirmationModal
+          connectionCount={connections.length}
+          isOpen={showSaveModal}
+          itemCount={droppedItems.length}
+          projectName={projectMetadata?.name || "Untitled Project"}
+          onClose={() => setShowSaveModal(false)}
+          onConfirm={handleSaveChanges}
+        />
+        {/* Unsaved Changes Modal */}
+        <UnsavedChangesModal
+          context={unsavedContext}
+          isOpen={showUnsavedModal}
+          projectName={projectMetadata?.name || "Untitled Project"}
+          onClose={() => {
+            setShowUnsavedModal(false);
+          }}
+          onDiscardAndProceed={
+            unsavedContext === "navigation"
+              ? handleDiscardAndNavigate
+              : handleDiscardAndCreateNew
+          }
+          onSaveAndProceed={
+            unsavedContext === "navigation"
+              ? handleSaveAndNavigate
+              : handleSaveAndCreateNew
+          }
+        />
+
+        {/* New Project Modal */}
+        <NewProjectModal
+          isOpen={showNewProjectModal}
+          onClose={() => setShowNewProjectModal(false)}
+          onCreate={handleCreateNewProject}
         />
       </div>
     </div>
