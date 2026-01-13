@@ -225,6 +225,7 @@ export default function Components() {
 
     // Construct new component object as per requirements
     const newComponent: ComponentItem = {
+      id: 0,
       name,
       icon: iconFile || "",
       svg: svgFile || iconFile || "", // Fallback to icon if SVG not provided
@@ -345,7 +346,7 @@ export default function Components() {
                           className="absolute top-1 right-1 opacity-100 group-hover:opacity-100 transition-opacity bg-white/50 backdrop-blur-sm z-20"
                           size="sm"
                           variant="light"
-                          onPress={(e) => {
+                          onPress={() => {
                             handleEdit(catName, item);
                           }}
                         >

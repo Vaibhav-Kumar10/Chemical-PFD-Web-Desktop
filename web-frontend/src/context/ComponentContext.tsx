@@ -37,7 +37,7 @@ const ComponentContext = createContext<ComponentContextType | undefined>(
 // Convert backend ComponentData to frontend ComponentItem format
 function convertToComponentItem(data: ComponentData): ComponentItem {
   return {
-    id: data.id,
+    id: data.id ?? 0,
     name: data.name,
     icon: data.png_url || data.svg_url || "",
     svg: data.svg_url || "",
