@@ -1,4 +1,4 @@
-import React from "react";
+import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -135,6 +135,7 @@ describe("Login Page", () => {
 
     expect(usernameInput).toHaveValue("testuser");
     expect(passwordInput).toHaveValue("testpass123");
+    
   });
 
   it("calls loginUser with correct credentials on form submit", async () => {
@@ -152,10 +153,12 @@ describe("Login Page", () => {
     const passwordInput = screen.getByPlaceholderText(/Enter your password/i);
     const submitButton = screen.getByText(/Sign In/i);
 
-    fireEvent.change(usernameInput, { target: { value: "testuser" } });
-    fireEvent.change(passwordInput, { target: { value: "testpass" } });
-    fireEvent.click(submitButton);
-
+    
+    await act(async () => {
+        fireEvent.change(usernameInput, { target: { value: "testuser" } });
+        fireEvent.change(passwordInput, { target: { value: "testpass" } });
+        fireEvent.click(submitButton);
+    });
     // Check that loginUser was called with correct credentials
     expect(mockedLoginUser).toHaveBeenCalledWith("testuser", "testpass");
   });
