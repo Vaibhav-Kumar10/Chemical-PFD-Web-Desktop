@@ -60,21 +60,8 @@ class Command(BaseCommand):
                     component = existing
                     self.stdout.write(f"Updating {comp_name}...")
                 else:
-                    # Fallback: check by object if available
-                    obj_key = comp_data.get('object')
-                    if obj_key:
-                        existing_by_object = Component.objects.filter(object=obj_key, parent=category).first()
-                        if existing_by_object:
-                            component = existing_by_object
-                            # Update name since it changed
-                            component.name = comp_name 
-                            self.stdout.write(f"Renaming {existing_by_object.name} to {comp_name}...")
-                        else:
-                            component = Component(name=comp_name, parent=category)
-                            component.s_no = s_no_candidate
-                    else:
-                        component = Component(name=comp_name, parent=category)
-                        component.s_no = s_no_candidate
+                    component = Component(name=comp_name, parent=category)
+                    component.s_no = s_no_candidate # Set initial s_no
                 
                 # Update fields
                 component.parent = category # Ensure correct

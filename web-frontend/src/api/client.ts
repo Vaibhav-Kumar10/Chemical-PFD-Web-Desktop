@@ -15,11 +15,8 @@ client.interceptors.request.use(
     const token = localStorage.getItem("access_token");
 
     if (token) {
-      // Don't attach token for auth endpoints to avoid 401s if token is invalid/stale
-      if (!config.url?.includes("/auth/login/") && !config.url?.includes("/auth/register/")) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log("Attached Token:", token.substring(0, 10) + "..."); // [DEBUG]
-      }
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log("Attached Token:", token.substring(0, 10) + "..."); // [DEBUG]
     } else {
       console.warn("No access token found in localStorage");
     }

@@ -66,7 +66,7 @@
             "object": "SolidFuelFurnace",
             "args": []
         },
-        "One Cell Fired Heater": {
+        "One Cell Fired Heater, Furnace": {
             "name": "One Cell Fired Heater",
             "icon": "./assets/toolbar/Furnaces and Boilers/One Cell Fired Heater, Furnace.png",
             "svg": "./assets/svg/Furnaces and Boilers/One Cell Fired Heater, Furnace.svg",
@@ -74,7 +74,7 @@
             "object": "OneCellFiredHeater,Furnace",
             "args": []
         },
-        "Two Cell Fired Heater": {
+        "Two Cell Fired Heater, Furnace": {
             "name": "Two Cell Fired Heater",
             "icon": "./assets/toolbar/Furnaces and Boilers/Two Cell Fired Heater, Furnace.png",
             "svg": "./assets/svg/Furnaces and Boilers/Two Cell Fired Heater, Furnace.svg",
@@ -84,7 +84,7 @@
         }
     },
     "Heating or Cooling Arrangements": {
-        "905 Exchanger": {
+        "905Exchanger": {
             "name": "Exchanger",
             "icon": "./assets/toolbar/Heating or Cooling Arrangements/905Exchanger.png",
             "svg": "./assets/svg/Heating or Cooling Arrangements/905Exchanger.svg",
@@ -92,7 +92,7 @@
             "object": "Exchanger905",
             "args": []
         },
-        "907 Kettle Reboiler": {
+        "907Kettle Reboiler": {
             "name": "Kettle Reboiler",
             "icon": "./assets/toolbar/Heating or Cooling Arrangements/907Kettle Reboiler.png",
             "svg": "./assets/svg/Heating or Cooling Arrangements/907Kettle Reboiler.svg",
@@ -305,35 +305,11 @@
             "class": "Valves",
             "object": "GateValve",
             "args": []
-        },
-        "Butterfly Valve": {
-            "name": "Butterfly Valve",
-            "icon": "./assets/toolbar/Valves/Butterfly Valve.png",
-            "svg": "./assets/svg/Valves/Butterfly Valve.svg",
-            "class": "Valves",
-            "object": "ButterflyValve",
-            "args": []
-        },
-        "Float Valve": {
-            "name": "Float Valve",
-            "icon": "./assets/toolbar/Valves/Float Valve.png",
-            "svg": "./assets/svg/Valves/Float Valve.svg",
-            "class": "Valves",
-            "object": "FloatValve",
-            "args": []
-        },
-        "Globe Valve": {
-            "name": "Globe Valve",
-            "icon": "./assets/toolbar/Valves/Globe Valve.png",
-            "svg": "./assets/svg/Valves/Globe Valve.svg",
-            "class": "Valves",
-            "object": "GlobeValve",
-            "args": []
         }
     },
     "Dryers": {
-        "Continuous Dryer": {
-            "name": "Continuous Dryer",
+        "Continuos Dryer": {
+            "name": "Continuos Dryer",
             "icon": "./assets/toolbar/Dryers/Continuous Dryer.png",
             "svg": "./assets/svg/Dryers/Continuous Dryer.svg",
             "class": "Dryers",
