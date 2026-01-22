@@ -26,7 +26,8 @@ export const CanvasItemImage = ({
   isDrawingConnection = false,
   hoveredGrip = null,
 }: CanvasItemImageProps) => {
-  const [image] = useImage(item.svg || item.icon);
+  const [image] = useImage(item.svg || item.icon, "anonymous");
+
   const groupRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
