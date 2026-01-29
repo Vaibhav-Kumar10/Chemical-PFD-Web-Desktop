@@ -1,2 +1,6 @@
 PyQt5
 requests
+pandas
+openpyxl
+PyMuPDF
+xlsxwriter

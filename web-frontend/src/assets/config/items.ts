@@ -1,4 +1,6 @@
 // Import all PNG toolbar icons
+import gripsData from "./grips.json";
+
 import CentrifugalCompressorIcon from "@/assets/toolbar/Compressors/Centrifugal Compressor.png";
 import EjectorCompressorIcon from "@/assets/toolbar/Compressors/Ejector Compressor.png";
 import FanIcon from "@/assets/toolbar/Compressors/Fan.png";
@@ -19,7 +21,6 @@ import OilGasOrPulverizedFuelFurnaceIcon from "@/assets/toolbar/Furnaces and Boi
 import SolidFuelFurnaceIcon from "@/assets/toolbar/Furnaces and Boilers/Solid Fuel Furnace.png";
 import OneCellFiredHeaterFurnaceIcon from "@/assets/toolbar/Furnaces and Boilers/One Cell Fired Heater, Furnace.png";
 import TwoCellFiredHeaterFurnaceIcon from "@/assets/toolbar/Furnaces and Boilers/Two Cell Fired Heater, Furnace.png";
-
 import OilGasOrPulverizedFuelFurnaceSVG from "@/assets/svg/Furnaces and Boilers/Oil Gas or Pulverized Fuel Furnace.svg";
 import SolidFuelFurnaceSVG from "@/assets/svg/Furnaces and Boilers/Solid Fuel Furnace.svg";
 import OneCellFiredHeaterFurnaceSVG from "@/assets/svg/Furnaces and Boilers/One Cell Fired Heater, Furnace.svg";
@@ -32,7 +33,6 @@ import ExchangerIcon from "@/assets/toolbar/Heating or Cooling Arrangements/Exch
 import HeatExchangerIcon from "@/assets/toolbar/Heating or Cooling Arrangements/Heat Exchanger.png";
 import ImmersionCoilIcon from "@/assets/toolbar/Heating or Cooling Arrangements/Immersion Coil.png";
 import KettleReboilerIcon from "@/assets/toolbar/Heating or Cooling Arrangements/Kettle Reboiler.png";
-
 import Exchanger905SVG from "@/assets/svg/Heating or Cooling Arrangements/905Exchanger.svg";
 import KettleReboiler907SVG from "@/assets/svg/Heating or Cooling Arrangements/907Kettle Reboiler.svg";
 import ExchangerSVG from "@/assets/svg/Heating or Cooling Arrangements/Exchanger.svg";
@@ -43,14 +43,12 @@ import KettleReboilerSVG from "@/assets/svg/Heating or Cooling Arrangements/Kett
 // Piping
 import InflowLineIcon from "@/assets/toolbar/Piping/Inflow Line.png";
 import OutflowLineIcon from "@/assets/toolbar/Piping/Outflow Line.png";
-
 import InflowLineSVG from "@/assets/svg/Piping/Inflow Line.svg";
 import OutflowLineSVG from "@/assets/svg/Piping/Outflow Line.svg";
 
 // Fittings
 import ReducerExpanderIcon from "@/assets/toolbar/Fittings/Reducer, Expander.png";
 import FilterIcon from "@/assets/toolbar/Fittings/Filter.png";
-
 import ReducerExpanderSVG from "@/assets/svg/Fittings/Reducer, Expander.svg";
 import FilterSVG from "@/assets/svg/Fittings/Filter.svg";
 
@@ -59,7 +57,6 @@ import HorizontalVesselIcon from "@/assets/toolbar/Process Vessels/Horizontal Ve
 import PackedVesselIcon from "@/assets/toolbar/Process Vessels/Packed Vessel.png";
 import TraysOrPlatesIcon from "@/assets/toolbar/Process Vessels/Trays or plates.png";
 import VerticalVesselIcon from "@/assets/toolbar/Process Vessels/Vertical Vessel.png";
-
 import HorizontalVesselSVG from "@/assets/svg/Process Vessels/Horizontal Vessel.svg";
 import PackedVesselSVG from "@/assets/svg/Process Vessels/Packed Vessel.svg";
 import TraysOrPlatesSVG from "@/assets/svg/Process Vessels/Trays or plates.svg";
@@ -74,7 +71,6 @@ import PlungerPumpIcon from "@/assets/toolbar/Pumps/Plunger Pump.png";
 import ProportioningPumpIcon from "@/assets/toolbar/Pumps/Proportioning Pump.png";
 import ReciprocatingPumpIcon from "@/assets/toolbar/Pumps/Reciprocating Pump.png";
 import CentrifugalPumpIcon from "@/assets/toolbar/Pumps/Centrifugal Pump.png";
-
 import BlowingEggSVG from "@/assets/svg/Pumps/Blowing Egg.svg";
 import DuplexPumpSVG from "@/assets/svg/Pumps/Duplex Pump.svg";
 import EjectorVaporServiceSVG from "@/assets/svg/Pumps/Ejector(Vapor Service).svg";
@@ -91,13 +87,18 @@ import SeparatorsForLiquidsDecanterSVG from "@/assets/svg/Separators/Separators 
 // Storage Vessels Tanks
 import FixedRoofTankIcon from "@/assets/toolbar/Storage Vessels Tanks/Fixed Roof Tank.png";
 import FloatingRoofTankIcon from "@/assets/toolbar/Storage Vessels Tanks/Floating Roof Tank.png";
-
 import FixedRoofTankSVG from "@/assets/svg/Storage Vessels Tanks/Fixed Roof Tank.svg";
 import FloatingRoofTankSVG from "@/assets/svg/Storage Vessels Tanks/Floating Roof Tank.svg";
 
 // Valves
 import GateValveIcon from "@/assets/toolbar/Valves/Gate Valve.png";
+import ButterflyValveIcon from "@/assets/toolbar/Valves/Butterfly Valve.png";
+import FloatValveIcon from "@/assets/toolbar/Valves/Float Valve.png";
+import GlobeValveIcon from "@/assets/toolbar/Valves/Globe Valve.png";
 import GateValveSVG from "@/assets/svg/Valves/Gate Valve.svg";
+import ButterflyValveSVG from "@/assets/svg/Valves/Butterfly Valve.svg";
+import FloatValveSVG from "@/assets/svg/Valves/Float Valve.svg";
+import GlobeValveSVG from "@/assets/svg/Valves/Globe Valve.svg";
 
 // Dryers
 import ContinuousDryerIcon from "@/assets/toolbar/Dryers/Continuous Dryer.png";
@@ -106,13 +107,15 @@ import ContinuousDryerSVG from "@/assets/svg/Dryers/Continuous Dryer.svg";
 // Size Reduction Equipments
 import JawCrusherIcon from "@/assets/toolbar/Size Reduction Equipements/Jaw Crusher.png";
 import RollerCrusherIcon from "@/assets/toolbar/Size Reduction Equipements/Roller Crusher.png";
-
 import JawCrusherSVG from "@/assets/svg/Size Reduction Equipements/Jaw Crusher.svg";
 import RollerCrusherSVG from "@/assets/svg/Size Reduction Equipements/Roller Crusher.svg";
 
 // Feeders
 import GeneralSymbolIcon from "@/assets/toolbar/Feeders/General Symbol.png";
 import GeneralSymbolSVG from "@/assets/svg/Feeders/General Symbol.svg";
+
+// Import grips data
+import { ComponentItem } from "@/components/Canvas/types";
 
 export interface componentConfigEntry {
   name: string;
@@ -121,9 +124,22 @@ export interface componentConfigEntry {
   class: string;
   object: string;
   args: any[];
+  grips?: { x: number; y: number; side: string }[];
 }
 
-export const componentsConfig = {
+// Helper function to get grips for a component
+const getGripsForComponent = (componentName: string, category: string) => {
+  const gripEntry = gripsData.find(
+    (entry) => entry.component === componentName && entry.category === category,
+  );
+
+  return (gripEntry?.grips || []).map((g) => ({
+    ...g,
+    side: g.side as "top" | "bottom" | "left" | "right",
+  }));
+};
+
+export const componentsConfig: Record<string, Record<string, ComponentItem>> = {
   Compressors: {
     "Centrifugal Compressor": {
       name: "Centrifugal Compressor",
@@ -131,23 +147,33 @@ export const componentsConfig = {
       svg: CentrifugalCompressorSVG,
       class: "Compressors",
       object: "CentrifugalCompressor",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent("Centrifugal Compressor", "Compressors"),
     },
+
     "Ejector Compressor": {
       name: "Ejector Compressor",
       icon: EjectorCompressorIcon,
       svg: EjectorCompressorSVG,
       class: "Compressors",
       object: "EjectorCompressor",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent("Ejector Compressor", "Compressors"),
     },
-    "Fan": {
+    Fan: {
       name: "Fan",
       icon: FanIcon,
       svg: FanSVG,
       class: "Compressors",
       object: "Fan",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent("Fan", "Compressors"),
     },
     "Positive Displacement Compressor": {
       name: "Positive Displacement Compressor",
@@ -155,7 +181,13 @@ export const componentsConfig = {
       svg: PositiveDisplacementCompressorSVG,
       class: "Compressors",
       object: "PositiveDisplacementCompressor",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent(
+        "Positive Displacement Compressor",
+        "Compressors",
+      ),
     },
     "Reciprocating Compressor": {
       name: "Reciprocating Compressor",
@@ -163,16 +195,22 @@ export const componentsConfig = {
       svg: ReciprocatingCompressorSVG,
       class: "Compressors",
       object: "ReciprocatingCompressor",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent("Reciprocating Compressor", "Compressors"),
     },
-    "Turbine": {
+    Turbine: {
       name: "Turbine",
       icon: TurbineIcon,
       svg: TurbineSVG,
       class: "Compressors",
       object: "Turbine",
-      args: []
-    }
+      args: [],
+      legend: "C",
+      suffix: "A/B",
+      grips: getGripsForComponent("Turbine", "Compressors"),
+    },
   },
   "Furnaces and Boilers": {
     "Oil Gas or Pulverized Fuel Furnace": {
@@ -181,7 +219,13 @@ export const componentsConfig = {
       svg: OilGasOrPulverizedFuelFurnaceSVG,
       class: "Furnaces and Boilers",
       object: "OilGasOrPulverizedFuelFurnace",
-      args: []
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "Oil Gas or Pulverized Fuel Furnace",
+        "Furnaces and Boilers",
+      ),
     },
     "Solid Fuel Furnace": {
       name: "Solid Fuel Furnace",
@@ -189,7 +233,10 @@ export const componentsConfig = {
       svg: SolidFuelFurnaceSVG,
       class: "Furnaces and Boilers",
       object: "SolidFuelFurnace",
-      args: []
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent("Solid Fuel Furnace", "Furnaces and Boilers"),
     },
     "One Cell Fired Heater, Furnace": {
       name: "One Cell Fired Heater, Furnace",
@@ -197,7 +244,13 @@ export const componentsConfig = {
       svg: OneCellFiredHeaterFurnaceSVG,
       class: "Furnaces and Boilers",
       object: "OneCellFiredHeater,Furnace",
-      args: []
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "One Cell Fired Heater",
+        "Furnaces and Boilers",
+      ),
     },
     "Two Cell Fired Heater, Furnace": {
       name: "Two Cell Fired Heater, Furnace",
@@ -205,8 +258,14 @@ export const componentsConfig = {
       svg: TwoCellFiredHeaterFurnaceSVG,
       class: "Furnaces and Boilers",
       object: "TwoCellFiredHeater,Furnace",
-      args: []
-    }
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "Two Cell Fired Heater",
+        "Furnaces and Boilers",
+      ),
+    },
   },
   "Heating or Cooling Arrangements": {
     "905Exchanger": {
@@ -215,7 +274,13 @@ export const componentsConfig = {
       svg: Exchanger905SVG,
       class: "Heating or Cooling Arrangements",
       object: "Exchanger905",
-      args: []
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "905 Exchanger",
+        "Heating or Cooling Arrangements",
+      ),
     },
     "907Kettle Reboiler": {
       name: "Kettle Reboiler",
@@ -223,15 +288,28 @@ export const componentsConfig = {
       svg: KettleReboiler907SVG,
       class: "Heating or Cooling Arrangements",
       object: "KettleReboiler907",
-      args: []
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "907 Kettle Reboiler",
+        "Heating or Cooling Arrangements",
+      ),
     },
-    "Exchanger": {
+    Exchanger: {
       name: "Exchanger",
       icon: ExchangerIcon,
       svg: ExchangerSVG,
       class: "Heating or Cooling Arrangements",
       object: "Exchanger",
-      args: []
+      args: [],
+      legend: "PRV",
+      suffix: "B",
+
+      grips: getGripsForComponent(
+        "Exchanger",
+        "Heating or Cooling Arrangements",
+      ),
     },
     "Heat Exchanger": {
       name: "Heat Exchanger",
@@ -239,7 +317,14 @@ export const componentsConfig = {
       svg: HeatExchangerSVG,
       class: "Heating or Cooling Arrangements",
       object: "HeatExchanger",
-      args: []
+      args: [],
+      legend: "SR",
+      suffix: "B",
+
+      grips: getGripsForComponent(
+        "Heat Exchanger",
+        "Heating or Cooling Arrangements",
+      ),
     },
     "Immersion Coil": {
       name: "Immersion Coil",
@@ -247,7 +332,13 @@ export const componentsConfig = {
       svg: ImmersionCoilSVG,
       class: "Heating or Cooling Arrangements",
       object: "ImmersionCoil",
-      args: []
+      args: [],
+      legend: "E",
+      suffix: "A",
+      grips: getGripsForComponent(
+        "Immersion Coil",
+        "Heating or Cooling Arrangements",
+      ),
     },
     "Kettle Reboiler": {
       name: "Kettle Reboiler",
@@ -255,17 +346,27 @@ export const componentsConfig = {
       svg: KettleReboilerSVG,
       class: "Heating or Cooling Arrangements",
       object: "KettleReboiler",
-      args: []
-    }
+      args: [],
+      legend: "E",
+
+      grips: getGripsForComponent(
+        "Kettle Reboiler",
+        "Heating or Cooling Arrangements",
+      ),
+    },
   },
-  "Piping": {
+  Piping: {
     "Inflow Line": {
       name: "Inflow Line",
       icon: InflowLineIcon,
       svg: InflowLineSVG,
       class: "Piping",
       object: "InflowLine",
-      args: []
+      args: [],
+      legend: "E",
+      suffix: "B",
+
+      grips: getGripsForComponent("Inflow Line", "Piping"),
     },
     "Outflow Line": {
       name: "Outflow Line",
@@ -273,26 +374,37 @@ export const componentsConfig = {
       svg: OutflowLineSVG,
       class: "Piping",
       object: "OutflowLine",
-      args: []
-    }
+      args: [],
+      legend: "",
+
+      grips: getGripsForComponent("Outflow Line", "Piping"),
+    },
   },
-  "Fittings": {
+  Fittings: {
     "Reducer, Expander": {
       name: "Reducer, Expander",
       icon: ReducerExpanderIcon,
       svg: ReducerExpanderSVG,
       class: "Fittings",
       object: "ReducerExpander",
-      args: []
+      args: [],
+      legend: "E",
+      suffix: "A",
+
+      grips: getGripsForComponent("Reducer, Expander", "Fittings"),
     },
-    "Filter": {
+    Filter: {
       name: "Filter",
       icon: FilterIcon,
       svg: FilterSVG,
       class: "Filter",
       object: "Filter",
-      args: []
-    }
+      args: [],
+      legend: "C",
+      suffix: "B",
+
+      grips: getGripsForComponent("Filter", "Fittings"),
+    },
   },
   "Process Vessels": {
     "Horizontal Vessel": {
@@ -301,7 +413,11 @@ export const componentsConfig = {
       svg: HorizontalVesselSVG,
       class: "Process Vessels",
       object: "HorizontalVessel",
-      args: []
+      args: [],
+      legend: "SR",
+      suffix: "B",
+
+      grips: getGripsForComponent("Horizontal Vessel", "Process Vessels"),
     },
     "Packed Vessel": {
       name: "Packed Vessel",
@@ -309,7 +425,11 @@ export const componentsConfig = {
       svg: PackedVesselSVG,
       class: "Process Vessels",
       object: "PackedVessel",
-      args: []
+      args: [],
+      legend: "C",
+      suffix: "B",
+
+      grips: getGripsForComponent("Packed Vessel", "Process Vessels"),
     },
     "Trays or plates": {
       name: "Trays or plates",
@@ -317,7 +437,8 @@ export const componentsConfig = {
       svg: TraysOrPlatesSVG,
       class: "Process Vessels",
       object: "TraysOrPlates",
-      args: []
+      args: [],
+
     },
     "Vertical Vessel": {
       name: "Vertical Vessel",
@@ -325,17 +446,24 @@ export const componentsConfig = {
       svg: VerticalVesselSVG,
       class: "Process Vessels",
       object: "VerticalVessel",
-      args: []
-    }
+      args: [],
+      legend: "SR",
+      suffix: "A/B",
+
+      grips: getGripsForComponent("Vertical Vessel", "Process Vessels"),
+    },
   },
-  "Pumps": {
+  Pumps: {
     "Blowing Egg": {
       name: "Blowing Egg",
       icon: BlowingEggIcon,
       svg: BlowingEggSVG,
       class: "Pumps",
       object: "BlowingEgg",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+      grips: getGripsForComponent("Blowing Egg", "Pumps"),
     },
     "Duplex Pump": {
       name: "Duplex Pump",
@@ -343,7 +471,11 @@ export const componentsConfig = {
       svg: DuplexPumpSVG,
       class: "Pumps",
       object: "DuplexPump",
-      args: []
+      args: [],
+      legend: "PRV",
+
+      suffix: "A/B",
+      grips: getGripsForComponent("Duplex Pump", "Pumps"),
     },
     "Ejector(Vapor Service)": {
       name: "EjectorVapor Service",
@@ -351,7 +483,10 @@ export const componentsConfig = {
       svg: EjectorVaporServiceSVG,
       class: "Pumps",
       object: "EjectorVaporService",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+      grips: getGripsForComponent("Ejector(Vapor Service)", "Pumps"),
     },
     "Hand Pump with Drum": {
       name: "Hand Pump with Drum",
@@ -359,7 +494,10 @@ export const componentsConfig = {
       svg: HandPumpWithDrumSVG,
       class: "Pumps",
       object: "HandPumpWithDrum",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A",
+      grips: getGripsForComponent("Hand Pump with Drum", "Pumps"),
     },
     "Plunger Pump": {
       name: "Plunger Pump",
@@ -367,7 +505,10 @@ export const componentsConfig = {
       svg: PlungerPumpSVG,
       class: "Pumps",
       object: "PlungerPump",
-      args: []
+      args: [],
+      legend: "P",
+
+      grips: getGripsForComponent("Plunger Pump", "Pumps"),
     },
     "Proportioning Pump": {
       name: "Proportioning Pump",
@@ -375,7 +516,10 @@ export const componentsConfig = {
       svg: ProportioningPumpSVG,
       class: "Pumps",
       object: "ProportioningPump",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+      grips: getGripsForComponent("Proportioning Pump", "Pumps"),
     },
     "Reciprocating Pump": {
       name: "Reciprocating Pump",
@@ -383,7 +527,11 @@ export const componentsConfig = {
       svg: ReciprocatingPumpSVG,
       class: "Pumps",
       object: "ReciprocatingPump",
-      args: []
+      args: [],
+      legend: "E",
+
+      suffix: "A/B",
+      grips: getGripsForComponent("Reciprocating Pump", "Pumps"),
     },
     "Centrifugal Pump": {
       name: "Centrifugal Pump",
@@ -391,18 +539,28 @@ export const componentsConfig = {
       svg: CentrifugalPumpSVG,
       class: "Pumps",
       object: "CentrifugalPump",
-      args: []
-    }
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+      grips: getGripsForComponent("Centrifugal Pump", "Pumps"),
+    },
   },
-  "Separators": {
+  Separators: {
     "Separators for Liquids, Decanter": {
       name: "Separators for Liquids, Decanter",
       icon: SeparatorsForLiquidsDecanterIcon,
       svg: SeparatorsForLiquidsDecanterSVG,
       class: "Separators",
       object: "SeparatorsForLiquids,Decanter",
-      args: []
-    }
+      args: [],
+      legend: "C",
+      suffix: "B",
+
+      grips: getGripsForComponent(
+        "Separators for Liquids, Decanter",
+        "Separators",
+      ),
+    },
   },
   "Storage Vessels Tanks": {
     "Fixed Roof Tank": {
@@ -411,7 +569,11 @@ export const componentsConfig = {
       svg: FixedRoofTankSVG,
       class: "Storage Vessels Tanks",
       object: "FixedRoofTank",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+
+      grips: getGripsForComponent("Fixed Roof Tank", "Storage Vessels Tanks"),
     },
     "Floating Roof Tank": {
       name: "Floating Roof Tank",
@@ -419,28 +581,75 @@ export const componentsConfig = {
       svg: FloatingRoofTankSVG,
       class: "Storage Vessels Tanks",
       object: "FloatingRoofTank",
-      args: []
-    }
+      args: [],
+      legend: "TK",
+
+      grips: getGripsForComponent(
+        "Floating Roof Tank",
+        "Storage Vessels Tanks",
+      ),
+    },
   },
-  "Valves": {
+  Valves: {
     "Gate Valve": {
       name: "Gate Valve",
       icon: GateValveIcon,
       svg: GateValveSVG,
       class: "Valves",
       object: "GateValve",
-      args: []
-    }
+      args: [],
+      legend: "E",
+      suffix: "A/B",
+      grips: getGripsForComponent("Gate Valve", "Valves"),
+    },
+    "Butterfly Valve": {
+      name: "Butterfly Valve",
+      icon: ButterflyValveIcon,
+      svg: ButterflyValveSVG,
+      class: "Valves",
+      object: "ButterflyValve",
+      args: [],
+      legend: "C",
+
+      suffix: "A/B",
+      grips: getGripsForComponent("Butterfly Valve", "Valves"),
+    },
+    "Float Valve": {
+      name: "Float Valve",
+      icon: FloatValveIcon,
+      svg: FloatValveSVG,
+      class: "Valves",
+      object: "FloatValve",
+      args: [],
+      legend: "PRV",
+      suffix: "B",
+      grips: getGripsForComponent("Float Valve", "Valves"),
+    },
+    "Globe Valve": {
+      name: "Globe Valve",
+      icon: GlobeValveIcon,
+      svg: GlobeValveSVG,
+      class: "Valves",
+      object: "GlobeValve",
+      args: [],
+      legend: "PRV",
+      suffix: "A/B",
+      grips: getGripsForComponent("Globe Valve", "Valves"),
+    },
   },
-  "Dryers": {
+  Dryers: {
     "Continuos Dryer": {
       name: "Continuos Dryer",
       icon: ContinuousDryerIcon,
       svg: ContinuousDryerSVG,
       class: "Dryers",
       object: "ContinuousDryer",
-      args: []
-    }
+      args: [],
+      legend: "P",
+      suffix: "A",
+
+      grips: getGripsForComponent("Continuous Dryer", "Dryers"),
+    },
   },
   "Size Reduction Equipements": {
     "Jaw Crusher": {
@@ -449,7 +658,11 @@ export const componentsConfig = {
       svg: JawCrusherSVG,
       class: "Size Reduction Equipements",
       object: "JawCrusher",
-      args: []
+      args: [],
+      legend: "P",
+      suffix: "A/B",
+
+      grips: getGripsForComponent("Jaw Crusher", "Size Reduction Equipements"),
     },
     "Roller Crusher": {
       name: "Roller Crusher",
@@ -457,19 +670,27 @@ export const componentsConfig = {
       svg: RollerCrusherSVG,
       class: "Size Reduction Equipements",
       object: "RollerCrusher",
-      args: []
-    }
+      args: [],
+      legend: "SR",
+      suffix: "B",
+      grips: getGripsForComponent(
+        "Roller Crusher",
+        "Size Reduction Equipements",
+      ),
+    },
   },
-  "Feeders": {
+  Feeders: {
     "General Symbol": {
       name: "General Symbol",
       icon: GeneralSymbolIcon,
       svg: GeneralSymbolSVG,
       class: "Feeders",
       object: "GeneralSymbol",
-      args: []
-    }
-  }
-} as const;
+      args: [],
+      legend: "P",
+      suffix: "A/B",
 
-export type ComponentsConfig = typeof componentsConfig;
+      grips: getGripsForComponent("General Symbol", "Feeders"),
+    },
+  },
+};

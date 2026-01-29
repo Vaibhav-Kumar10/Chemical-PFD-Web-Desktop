@@ -43,6 +43,25 @@ def login(username: str, password: str):
     else:
         raise ApiError(f"Server error: {resp.status_code}")
 
+
+def get_components():
+    """
+    Fetch list of components from /api/components/
+    """
+    url = f"{app_state.BACKEND_BASE_URL}/api/components/"
+    try:
+        headers = {}
+        if app_state.access_token:
+            headers["Authorization"] = f"Bearer {app_state.access_token}"
+        
+        resp = requests.get(url, headers=headers, timeout=DEFAULT_TIMEOUT)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        print(f"Failed to fetch components: {e}")
+    return []
+
+
 def register(username: str, email: str, password: str):
     """
     Call Django /api/auth/register/ and return JSON if needed.
@@ -83,3 +102,42 @@ def register(username: str, email: str, password: str):
         or f"Registration failed (status {resp.status_code})."
     )
     raise ApiError(msg)
+
+def get_components():
+    url = f"{app_state.BACKEND_BASE_URL}/api/components/"
+    try:
+        headers = {}
+        if app_state.access_token:
+            headers["Authorization"] = f"Bearer {app_state.access_token}"
+        
+        resp = requests.get(url, headers=headers, timeout=DEFAULT_TIMEOUT)
+        if resp.status_code == 200:
+            data = resp.json()
+
+            # BACKEND RETURNS: { "components": [...] }
+            if isinstance(data, dict) and "components" in data:
+                return data["components"]
+
+            # if already a list, return it
+            if isinstance(data, list):
+                return data
+
+            print("[API WARNING] Unexpected component format:", data)
+            return []
+
+    except Exception as e:
+        print(f"Failed to fetch components: {e}")
+    return []
+
+def post_component(data, files):
+    """
+    Upload a new component (symbol) to backend.
+    """
+    url = f"{app_state.BACKEND_BASE_URL}/api/components/"
+
+    try:
+        response = requests.post(url, data=data, files=files)
+        return response
+    except Exception as e:
+        print("[API ERROR] POST failed:", e)
+        return None

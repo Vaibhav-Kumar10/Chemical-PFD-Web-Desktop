@@ -228,8 +228,7 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
                     "rotation": item.get("rotation", 0),
                     "scaleX": item.get("scaleX", 1),
                     "scaleY": item.get("scaleY", 1),
-                    "sequence": item.get("sequence", 0),
-                    "connections": item.get("connections", [])
+                    "sequence": item.get("sequence", 0)
                 }
             )
 
