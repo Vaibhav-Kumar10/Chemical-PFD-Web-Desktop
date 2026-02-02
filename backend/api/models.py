@@ -16,12 +16,13 @@ class Component(models.Model):
     name = models.CharField(max_length=100)
     legend = models.CharField(max_length=100, blank=True)
     suffix = models.CharField(max_length=10, blank=True)
-    object = models.CharField(max_length=100)
+    object = models.CharField(max_length=100, blank=True)
     svg = models.FileField(upload_to='components/', null=True, blank=True)
     png = models.ImageField(upload_to='components/', null=True, blank=True)
-    grips = models.JSONField(default=list)
+    grips = models.JSONField(default=list, blank=True)
     created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
