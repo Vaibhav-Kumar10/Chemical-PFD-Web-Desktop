@@ -558,6 +558,12 @@ class CanvasScreen(QMainWindow):
             
         canvas = active_sub.get_canvas()
         
+        # Check if this is the first time saving the project
+        if getattr(canvas, 'is_new_project', False):
+            success = self.on_save_as_file()
+            if not success:
+                return
+        
         # Check if canvas has project ID
         if not hasattr(canvas, 'project_id') or not canvas.project_id:
             QtWidgets.QMessageBox.warning(
@@ -602,7 +608,7 @@ class CanvasScreen(QMainWindow):
         active_sub = self.mdi_area.currentSubWindow()
         if not active_sub or not isinstance(active_sub, CanvasSubWindow):
              QtWidgets.QMessageBox.information(self, "Information", "No file to save.")
-             return
+             return False
              
         canvas = active_sub.get_canvas()
         options = QtWidgets.QFileDialog.Options()
@@ -613,7 +619,7 @@ class CanvasScreen(QMainWindow):
         )
         
         if not filename:
-             return
+             return False
 
         try:
             if filter_type.startswith("PDF") or filename.lower().endswith(".pdf"):
@@ -621,12 +627,14 @@ class CanvasScreen(QMainWindow):
                     filename += ".pdf"
                 canvas.export_to_pdf(filename)
                 QtWidgets.QMessageBox.information(self, "Success", f"Exported to {filename}")
+                return True
                 
             elif filter_type.startswith("JPEG") or filename.lower().endswith(".jpg"):
                 if not filename.lower().endswith(".jpg"):
                     filename += ".jpg"
                 canvas.export_to_image(filename)
                 QtWidgets.QMessageBox.information(self, "Success", f"Exported to {filename}")
+                return True
 
             else:
                 if not filename.lower().endswith(".pfd"):
@@ -635,9 +643,11 @@ class CanvasScreen(QMainWindow):
                 save_to_pfd(canvas, filename)
                 active_sub.setWindowTitle(f"Canvas - {os.path.basename(filename)}")
                 QtWidgets.QMessageBox.information(self, "Success", f"Project saved to {filename}")
+                return True
 
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to save file:\n{str(e)}")
+            return False
 
     def on_open_file(self):
         options = QtWidgets.QFileDialog.Options()
