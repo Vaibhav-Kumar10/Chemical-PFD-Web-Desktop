@@ -28,6 +28,7 @@ import { TbGridDots, TbGridPattern } from "react-icons/tb";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { CanvasItemImage } from "@/components/Canvas/CanvasItemImage";
 import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
+import { ConnectionPreview } from "@/components/Canvas/ConnectionPreview";
 import {
   ComponentLibrarySidebar,
   CanvasPropertiesSidebar,
@@ -1466,6 +1467,45 @@ export default function Editor() {
     },
   );
 
+  // --- Preview Connection Logic ---
+  let previewPathData: string | null = null;
+  let previewEnd: any;
+  let previewAngle: number | undefined;
+
+  if (isDrawingConnection && tempConnection) {
+    const fakeTarget = {
+      id: -9999,
+      x: tempConnection.currentX,
+      y: tempConnection.currentY,
+      width: 1,
+      height: 1,
+      naturalWidth: 1,
+      naturalHeight: 1,
+      grips: [{ x: 50, y: 50 }],
+    };
+
+    const previewConn = {
+      id: -1,
+      sourceItemId: tempConnection.sourceItemId,
+      sourceGripIndex: tempConnection.sourceGripIndex,
+      targetItemId: -9999,
+      targetGripIndex: 0,
+      waypoints: tempConnection.waypoints,
+    };
+
+    const map = calculateManualPathsWithBridges(
+      [previewConn as any],
+      [...droppedItems, fakeTarget as any]
+    );
+
+    const meta = map[-1];
+    if (meta) {
+      previewPathData = meta.pathData ?? null;
+      previewEnd = meta.endPoint;
+      previewAngle = meta.arrowAngle;
+    }
+  }
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header Bar */}
@@ -1763,27 +1803,8 @@ export default function Editor() {
             onMouseDown={(e) => {
               const clickedOnEmpty = e.target === e.target.getStage();
 
-              if (clickedOnEmpty && isDrawingConnection && tempConnection) {
-                const stage = stageRef.current;
-
-                if (stage) {
-                  const pointer = stage.getRelativePointerPosition();
-
-                  if (pointer) {
-                    setTempConnection((prev: any) =>
-                      prev
-                        ? {
-                          ...prev,
-                          waypoints: [
-                            ...prev.waypoints,
-                            { x: pointer.x, y: pointer.y },
-                          ],
-                        }
-                        : prev,
-                    );
-                  }
-                }
-
+              if (clickedOnEmpty && isDrawingConnection) {
+                handleCancelDrawing();
                 return;
               }
 
@@ -1846,19 +1867,11 @@ export default function Editor() {
               ))}
 
               {/* Render Temporary Connection Line (Drawing) */}
-              {tempConnection && (
-                <Line
-                  dash={[10, 5]}
-                  listening={false}
-                  points={[
-                    tempConnection.startX,
-                    tempConnection.startY,
-                    ...tempConnection.waypoints.flatMap((p) => [p.x, p.y]),
-                    tempConnection.currentX,
-                    tempConnection.currentY,
-                  ]}
-                  stroke="#9ca3af"
-                  strokeWidth={2}
+              {isDrawingConnection && tempConnection && (
+                <ConnectionPreview
+                  pathData={previewPathData}
+                  endPoint={previewEnd}
+                  arrowAngle={previewAngle}
                 />
               )}
 
@@ -1957,8 +1970,8 @@ export default function Editor() {
                           "bg-gradient-to-r from-blue-200 to-blue-400 dark:from-blue-800 dark:to-blue-600",
                         thumb: "bg-blue-600 dark:bg-blue-500",
                       }}
-                       maxValue={8000}
-                        minValue={2000}
+                      maxValue={8000}
+                      minValue={2000}
                       size="sm"
                       step={100}
                       value={componentSize}
@@ -2083,8 +2096,7 @@ export default function Editor() {
                 </span>
                 <div className="w-px h-3 bg-white/20" />
                 <span className="text-white/80 text-xs">
-                  Click empty space to add corner • Click target point to finish
-                  • Press Esc to cancel
+                  Click target point to finish • Press Esc to cancel
                 </span>
               </div>
             </div>

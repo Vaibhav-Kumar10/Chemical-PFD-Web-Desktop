@@ -12,6 +12,12 @@ interface Vector {
   x: number;
   y: number;
 }
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 // --- Helper Functions ---
 
@@ -35,6 +41,90 @@ const getGripPosition = (item: CanvasItem, gripIndex: number): Point | null => {
   const y = (item.y + renderY) + ((100 - grip.y) / 100) * renderHeight;
 
   return { x, y };
+};
+
+const getItemRects = (items: CanvasItem[]): Rect[] => {
+  return items.map((item) => {
+    const { x, y, width, height } = calculateAspectFit(
+      item.width,
+      item.height,
+      item.naturalWidth,
+      item.naturalHeight
+    );
+
+    return {
+      x: item.x + x,
+      y: item.y + y,
+      width,
+      height,
+    };
+  });
+};
+
+const segmentHitsRect = (p1: Point, p2: Point, r: Rect) => {
+  const minX = Math.min(p1.x, p2.x);
+  const maxX = Math.max(p1.x, p2.x);
+  const minY = Math.min(p1.y, p2.y);
+  const maxY = Math.max(p1.y, p2.y);
+
+  return !(
+    maxX < r.x ||
+    minX > r.x + r.width ||
+    maxY < r.y ||
+    minY > r.y + r.height
+  );
+};
+
+const smartRoute = (
+  start: Point,
+  end: Point,
+  items: CanvasItem[]
+): Point[] => {
+  const obstacles = getItemRects(items);
+
+  const candidates: Point[][] = [];
+
+  // horizontal first
+  candidates.push([{ x: end.x, y: start.y }]);
+
+  // vertical first
+  candidates.push([{ x: start.x, y: end.y }]);
+
+  // dogleg mid X
+  const midX = (start.x + end.x) / 2;
+  candidates.push([
+    { x: midX, y: start.y },
+    { x: midX, y: end.y },
+  ]);
+
+  // dogleg mid Y
+  const midY = (start.y + end.y) / 2;
+  candidates.push([
+    { x: start.x, y: midY },
+    { x: end.x, y: midY },
+  ]);
+
+  const hitsObstacle = (pts: Point[]) => {
+    const full = [start, ...pts, end];
+
+    for (let i = 0; i < full.length - 1; i++) {
+      for (const r of obstacles) {
+        if (segmentHitsRect(full[i], full[i + 1], r)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // pick first clean candidate
+  for (const c of candidates) {
+    if (!hitsObstacle(c)) return c;
+  }
+
+  // fallback
+  return candidates[0];
 };
 
 // Start point, End point, ID of the line, and full object for reference
@@ -160,45 +250,8 @@ export const calculateManualPathsWithBridges = (
 
     const points: Point[] = [start, startStandoff];
 
-    // --- Waypoint Filtering ---
-    // Remove waypoints that are likely "inside" the source or target due to import mismatches
-    // OR are too close to the start/end resulting in sharp turn-backs
-    const isInside = (p: Point, item: CanvasItem) => {
-      const { x: rX, y: rY, width: rW, height: rH } = calculateAspectFit(
-        item.width,
-        item.height,
-        item.naturalWidth,
-        item.naturalHeight
-      );
-      const absX = item.x + rX;
-      const absY = item.y + rY;
-      // buffer to be generous
-      const buffer = 10;
-      return (
-        p.x > absX + buffer &&
-        p.x < absX + rW - buffer &&
-        p.y > absY + buffer &&
-        p.y < absY + rH - buffer
-      );
-    };
-
-    if (conn.waypoints) {
-      const validWaypoints = conn.waypoints.filter(wp => {
-        // Check if inside
-        if (isInside(wp, source) || isInside(wp, target)) return false;
-
-        // Check if too close to grips (prevents "doubling back" from standoff)
-        const distToStart = len(sub(wp, start));
-        const distToEnd = len(sub(wp, end));
-
-        // If waypoint is closer than our standoff, skip it to let the standoff line handle the exit
-        if (distToStart < STANDOFF_DIST * 2.0) return false;
-        if (distToEnd < STANDOFF_DIST * 2.0) return false;
-
-        return true;
-      });
-      points.push(...validWaypoints);
-    }
+    const bends = smartRoute(startStandoff, endStandoff, items);
+    points.push(...bends);
 
     points.push(endStandoff);
     points.push(end);
