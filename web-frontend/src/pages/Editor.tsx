@@ -66,6 +66,8 @@ import {
   createProject,
 } from "@/api/projectApi";
 import { convertToBackendFormat, SavedProject } from "@/utils/projectStorage";
+import { buildGraph } from "../utils/graph/buildGraph";
+import { validateGraph } from "../utils/graph/validateGraph";
 
 type Shortcut = {
   key: string;
@@ -251,6 +253,19 @@ export default function Editor() {
   const connections = useMemo(() => {
     return currentState?.connections || [];
   }, [currentState?.connections]);
+
+  // Graph validation state
+  const [validationResult, setValidationResult] = useState<any>(null);
+
+  // Rebuild graph and validate process structure whenever components or connections change
+  useEffect(() => {
+    if (!droppedItems || droppedItems.length === 0) return;
+
+    const graph = buildGraph(droppedItems, connections);
+    const result = validateGraph(graph);
+
+    setValidationResult(result);
+  }, [droppedItems, connections]);
 
   // Update all existing components when size slider changes
   useEffect(() => {
@@ -1848,22 +1863,31 @@ export default function Editor() {
               )}
 
               {/* Render Components */}
-              {droppedItems.map((item: CanvasItem) => (
-                <CanvasItemImage
-                  key={item.id}
-                  hoveredGrip={hoveredGrip}
-                  isDrawingConnection={isDrawingConnection}
-                  isSelected={selectedItemIds.has(item.id)}
-                  item={item}
-                  onChange={(newAttrs) =>
-                    handleUpdateItem(newAttrs.id, newAttrs)
-                  }
-                  onGripMouseDown={handleGripMouseDown}
-                  onGripMouseEnter={handleGripMouseEnter}
-                  onGripMouseLeave={handleGripMouseLeave}
-                  onSelect={(e) => handleSelectItem(item.id, e)}
-                />
-              ))}
+              {droppedItems.map((item: CanvasItem) => {
+                const isInvalid =
+                  validationResult &&
+                  (validationResult.isolated.includes(item.id) ||
+                    validationResult.circular.includes(item.id) ||
+                    validationResult.brokenFlow.includes(item.id));
+
+                return (
+                  <CanvasItemImage
+                    key={item.id}
+                    hoveredGrip={hoveredGrip}
+                    isDrawingConnection={isDrawingConnection}
+                    isSelected={selectedItemIds.has(item.id)}
+                    isInvalid={isInvalid}
+                    item={item}
+                    onChange={(newAttrs) =>
+                      handleUpdateItem(newAttrs.id, newAttrs)
+                    }
+                    onGripMouseDown={handleGripMouseDown}
+                    onGripMouseEnter={handleGripMouseEnter}
+                    onGripMouseLeave={handleGripMouseLeave}
+                    onSelect={(e) => handleSelectItem(item.id, e)}
+                  />
+                );
+              })}
             </Layer>
           </Stage>
 
@@ -2162,6 +2186,46 @@ export default function Editor() {
           onClose={() => setShowNewProjectModal(false)}
           onCreate={handleCreateNewProject}
         />
+        {validationResult &&
+          (!validationResult.hasInlet ||
+            !validationResult.hasOutlet ||
+            validationResult.isolated.length > 0 ||
+            validationResult.circular.length > 0 ||
+            validationResult.brokenFlow.length > 0) && (
+            <div className="absolute bottom-6 right-6 bg-white border border-red-300 shadow-xl px-4 py-2 rounded text-sm z-[9999] space-y-1">
+              {!validationResult.hasInlet && (
+                <div className="text-red-600 font-medium">
+                  ⚠ No Inlet Component Found
+                </div>
+              )}
+
+              {!validationResult.hasOutlet && (
+                <div className="text-red-600 font-medium">
+                  ⚠ No Outlet Component Found
+                </div>
+              )}
+
+              {validationResult.isolated.length > 0 && (
+                <div className="text-red-600 font-medium">
+                  ⚠ {validationResult.isolated.length} Isolated Component(s)
+                </div>
+              )}
+
+              {validationResult.circular.length > 0 && (
+                <div className="text-red-600 font-medium">
+                  ⚠ {validationResult.circular.length} Component(s) in Circular
+                  Loop
+                </div>
+              )}
+
+              {validationResult.brokenFlow.length > 0 && (
+                <div className="text-red-600 font-medium">
+                  ⚠ {validationResult.brokenFlow.length} Component(s) with
+                  Broken Flow
+                </div>
+              )}
+            </div>
+          )}
       </div>
     </div>
   );
