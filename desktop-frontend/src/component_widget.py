@@ -13,8 +13,11 @@ class ComponentWidget(QWidget):
         self.config = config or {}
         self.renderer = QSvgRenderer(svg_path)
 
-        # Standard component size (closer to web default of 100x100)
-        self.setFixedSize(100, 60)
+        # Calculate proper component size based on SVG dimensions
+        svg_size = self.get_svg_dimensions()
+        logical_width, logical_height = self.calculate_logical_size(svg_size)
+        
+        self.setFixedSize(logical_width, logical_height)
 
         self.hover_port = None
         self.is_selected = False
@@ -25,8 +28,8 @@ class ComponentWidget(QWidget):
         self.drag_start_positions = {}
         
         # Logical Coordinates (True 100% scale geometry)
-        # Initialize from current geometry or valid defaults
-        self.logical_rect = QRectF(self.x(), self.y(), 100, 60)
+        # Initialize from current geometry with proper aspect ratio
+        self.logical_rect = QRectF(self.x(), self.y(), logical_width, logical_height)
 
         # Cache for grips to prevent file reading lag during paint events
         self._cached_grips = None
@@ -63,12 +66,37 @@ class ComponentWidget(QWidget):
     def calculate_svg_rect(self, content_rect):
         """
         Calculate the actual rectangle where SVG will be rendered.
-        Updated to FILL the content_rect (ignoring aspect ratio) to ensure
-        grips at 0% and 100% align with the widget edges.
+        Maintains aspect ratio while fitting within content_rect.
+        Centers the SVG if there's extra space.
         """
-        # We strictly fill the content_rect so that 0-100% mapping 
-        # aligns with the selection box edges.
-        return QRectF(content_rect)
+        svg_size = self.get_svg_dimensions()
+        svg_aspect = svg_size[0] / svg_size[1] if svg_size[1] > 0 else 1.0
+        content_aspect = content_rect.width() / content_rect.height() if content_rect.height() > 0 else 1.0
+        
+        if abs(svg_aspect - content_aspect) < 0.01:
+            # Aspect ratios match, fill the content rect
+            return QRectF(content_rect)
+        
+        # Calculate size that maintains aspect ratio
+        if svg_aspect > content_aspect:
+            # SVG is wider - fit to width
+            render_width = content_rect.width()
+            render_height = render_width / svg_aspect
+            x_offset = 0
+            y_offset = (content_rect.height() - render_height) / 2
+        else:
+            # SVG is taller - fit to height
+            render_height = content_rect.height()
+            render_width = render_height * svg_aspect
+            x_offset = (content_rect.width() - render_width) / 2
+            y_offset = 0
+        
+        return QRectF(
+            content_rect.x() + x_offset,
+            content_rect.y() + y_offset,
+            render_width,
+            render_height
+        )
     
     def map_svg_to_widget_coords(self, svg_x_percent, svg_y_percent, svg_rect):
         """
@@ -88,8 +116,54 @@ class ComponentWidget(QWidget):
     
     # _should_invert_y_axis REMOVED — web always inverts Y, so we do too
     
-
-
+    def get_svg_dimensions(self):
+        """
+        Get the natural dimensions from the SVG viewBox.
+        Returns (width, height) as a tuple.
+        """
+        if self.renderer.isValid():
+            default_size = self.renderer.defaultSize()
+            return (default_size.width(), default_size.height())
+        return (100, 100)  # Fallback
+    
+    def calculate_logical_size(self, svg_size):
+        """
+        Calculate logical component size that maintains aspect ratio.
+        Uses a standard scale factor so components are reasonably sized.
+        
+        Scale to approximately 100px on the longer dimension to match web defaults.
+        """
+        width, height = svg_size
+        
+        if width == 0 or height == 0:
+            return (100, 60)  # Fallback
+        
+        # Target size for the longer dimension
+        target_size = 100.0
+        
+        # Calculate aspect ratio
+        aspect_ratio = float(width) / float(height)
+        
+        if width >= height:
+            # Width is longer
+            logical_width = target_size
+            logical_height = target_size / aspect_ratio
+        else:
+            # Height is longer
+            logical_height = target_size
+            logical_width = target_size * aspect_ratio
+        
+        # Ensure minimum size for usability, but maintain aspect ratio
+        min_dimension = 20.0  # Absolute minimum for visibility
+        
+        if logical_width < min_dimension or logical_height < min_dimension:
+            # Scale up proportionally to meet minimum
+            scale_factor = max(min_dimension / logical_width, min_dimension / logical_height)
+            logical_width *= scale_factor
+            logical_height *= scale_factor
+        
+        # Round to nearest integer while preserving aspect ratio as much as possible
+        return (round(logical_width), round(logical_height))
 
     def load_grips_from_json(self):
         """
