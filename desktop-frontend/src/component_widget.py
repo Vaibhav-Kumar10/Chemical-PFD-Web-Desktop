@@ -27,6 +27,7 @@ class ComponentWidget(QWidget):
 
         self.setFixedSize(new_w, new_h)
 
+
         self.hover_port = None
         self.is_selected = False
         self.drag_start_global = None
@@ -116,8 +117,54 @@ class ComponentWidget(QWidget):
     
     # _should_invert_y_axis REMOVED — web always inverts Y, so we do too
     
-
-
+    def get_svg_dimensions(self):
+        """
+        Get the natural dimensions from the SVG viewBox.
+        Returns (width, height) as a tuple.
+        """
+        if self.renderer.isValid():
+            default_size = self.renderer.defaultSize()
+            return (default_size.width(), default_size.height())
+        return (100, 100)  # Fallback
+    
+    def calculate_logical_size(self, svg_size):
+        """
+        Calculate logical component size that maintains aspect ratio.
+        Uses a standard scale factor so components are reasonably sized.
+        
+        Scale to approximately 100px on the longer dimension to match web defaults.
+        """
+        width, height = svg_size
+        
+        if width == 0 or height == 0:
+            return (100, 60)  # Fallback
+        
+        # Target size for the longer dimension
+        target_size = 100.0
+        
+        # Calculate aspect ratio
+        aspect_ratio = float(width) / float(height)
+        
+        if width >= height:
+            # Width is longer
+            logical_width = target_size
+            logical_height = target_size / aspect_ratio
+        else:
+            # Height is longer
+            logical_height = target_size
+            logical_width = target_size * aspect_ratio
+        
+        # Ensure minimum size for usability, but maintain aspect ratio
+        min_dimension = 20.0  # Absolute minimum for visibility
+        
+        if logical_width < min_dimension or logical_height < min_dimension:
+            # Scale up proportionally to meet minimum
+            scale_factor = max(min_dimension / logical_width, min_dimension / logical_height)
+            logical_width *= scale_factor
+            logical_height *= scale_factor
+        
+        # Round to nearest integer while preserving aspect ratio as much as possible
+        return (round(logical_width), round(logical_height))
 
     def load_grips_from_json(self):
         """
