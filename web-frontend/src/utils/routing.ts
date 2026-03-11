@@ -27,18 +27,23 @@ export const getGripPosition = (item: CanvasItem, gripIndex: number): Point | nu
   if (!item.grips || gripIndex >= item.grips.length) return null;
 
   // Calculate the actual rendered box of the image
-  const { x: renderX, y: renderY, width: renderWidth, height: renderHeight } = calculateAspectFit(
+  const {
+    x: renderX,
+    y: renderY,
+    width: renderWidth,
+    height: renderHeight,
+  } = calculateAspectFit(
     item.width,
     item.height,
     item.naturalWidth,
-    item.naturalHeight
+    item.naturalHeight,
   );
 
   const grip = item.grips[gripIndex];
 
   // Grip position is relative to the RENDERED image, plus the item's absolute position
-  const x = (item.x + renderX) + (grip.x / 100) * renderWidth;
-  const y = (item.y + renderY) + ((100 - grip.y) / 100) * renderHeight;
+  const x = item.x + renderX + (grip.x / 100) * renderWidth;
+  const y = item.y + renderY + ((100 - grip.y) / 100) * renderHeight;
 
   return { x, y };
 };

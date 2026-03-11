@@ -13,17 +13,25 @@ class ComponentWidget(QWidget):
         self.config = config or {}
         self.renderer = QSvgRenderer(svg_path)
 
-        # Calculate proper component size based on SVG dimensions
-        svg_size = self.get_svg_dimensions()
-        logical_width, logical_height = self.calculate_logical_size(svg_size)
-        
-        self.setFixedSize(logical_width, logical_height)
+        # Dynamic size based on SVG dimensions
+        default_size = self.renderer.defaultSize()
+        w = default_size.width()
+        h = default_size.height()
+
+        if w > 0 and h > 0:
+            scale = 100.0 / max(w, h)
+            new_w = max(20, int(w * scale))
+            new_h = max(20, int(h * scale))
+        else:
+            new_w, new_h = 100, 60
+
+        self.setFixedSize(new_w, new_h)
+
 
         self.hover_port = None
         self.is_selected = False
         self.drag_start_global = None
         
-        self.rotation_angle = 0
         self.rotation_angle = 0
         self.drag_start_positions = {}
         
@@ -33,8 +41,8 @@ class ComponentWidget(QWidget):
         self.validation_error_msg = ""
         
         # Logical Coordinates (True 100% scale geometry)
-        # Initialize from current geometry with proper aspect ratio
-        self.logical_rect = QRectF(self.x(), self.y(), logical_width, logical_height)
+        # Initialize from current geometry or valid defaults
+        self.logical_rect = QRectF(self.x(), self.y(), new_w, new_h)
 
         # Cache for grips to prevent file reading lag during paint events
         self._cached_grips = None
