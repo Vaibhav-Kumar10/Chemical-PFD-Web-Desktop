@@ -33,12 +33,7 @@ import {
   ComponentLibrarySidebar,
   CanvasPropertiesSidebar,
 } from "@/components/Canvas/ComponentLibrarySidebar";
-import {
-  calculateManualPathsWithBridges,
-  smartRoute,
-  getGripPosition,
-  getStandoff,
-} from "@/utils/routing";
+import { calculateManualPathsWithBridges, smartRoute, getGripPosition, getStandoff } from "@/utils/routing";
 import { useComponents } from "@/context/ComponentContext";
 import ExportModal from "@/components/Canvas/ExportModal";
 // import { exportDiagram, downloadBlob } from "@/utils/exports";
@@ -1378,18 +1373,13 @@ export default function Editor() {
       (tempConnection.sourceItemId !== itemId ||
         tempConnection.sourceGripIndex !== gripIndex)
     ) {
-      const sourceItem = droppedItems.find(
-        (i) => i.id === tempConnection.sourceItemId,
-      );
+      const sourceItem = droppedItems.find((i) => i.id === tempConnection.sourceItemId);
       const targetItem = droppedItems.find((i) => i.id === itemId);
 
       let initialWaypoints = tempConnection.waypoints || [];
 
       if (initialWaypoints.length === 0 && sourceItem && targetItem) {
-        const start = getGripPosition(
-          sourceItem,
-          tempConnection.sourceGripIndex,
-        );
+        const start = getGripPosition(sourceItem, tempConnection.sourceGripIndex);
         const end = getGripPosition(targetItem, gripIndex);
         const sourceGrip = sourceItem.grips?.[tempConnection.sourceGripIndex];
         const targetGrip = targetItem.grips?.[gripIndex];
@@ -1397,11 +1387,7 @@ export default function Editor() {
         if (start && end) {
           const startStandoff = getStandoff(start, sourceGrip);
           const endStandoff = getStandoff(end, targetGrip);
-          initialWaypoints = smartRoute(
-            startStandoff,
-            endStandoff,
-            droppedItems,
-          );
+          initialWaypoints = smartRoute(startStandoff, endStandoff, droppedItems);
         }
       }
 
@@ -1575,7 +1561,7 @@ export default function Editor() {
 
     const map = calculateManualPathsWithBridges(
       [previewConn as any],
-      [...droppedItems, fakeTarget as any],
+      [...droppedItems, fakeTarget as any]
     );
 
     const meta = map[-1];
@@ -1902,61 +1888,40 @@ export default function Editor() {
             />
             <Layer>
               {/* Render Connections */}
-              {connections.map((connection: Connection) => {
-                const routerWaypoints =
-                  connectionPaths[connection.id]?.waypoints || [];
-                const savedWaypoints = connection.waypoints || [];
+              {connections.map((connection: Connection) => (
+                <ConnectionLine
+                  key={connection.id}
+                  arrowAngle={connectionPaths[connection.id]?.arrowAngle}
+                  connection={connection}
+                  isSelected={selectedConnectionIds.has(connection.id)}
+                  items={droppedItems}
+                  pathData={connectionPaths[connection.id]?.pathData}
+                  points={connectionPaths[connection.id]?.waypoints || []}
+                  targetPosition={connectionPaths[connection.id]?.endPoint}
+                  onWaypointDrag={(index: number, pos: { x: number, y: number }) => {
+                    if (!projectId) return;
+                    const newWaypoints = [...(connectionPaths[connection.id]?.waypoints || [])];
+                    newWaypoints[index] = pos;
+                    editorStore.updateConnection(projectId, connection.id, { waypoints: newWaypoints });
+                  }}
+                  onSelect={(e: Konva.KonvaEventObject<MouseEvent>) => {
+                    const isCtrl = e?.evt.ctrlKey || e?.evt.metaKey;
 
-                const pointsToRender =
-                  savedWaypoints.length > 0 ? savedWaypoints : routerWaypoints;
+                    setSelectedConnectionIds((prev: Set<number>) => {
+                      const next = new Set(isCtrl ? prev : []);
 
-                return (
-                  <ConnectionLine
-                    key={connection.id}
-                    arrowAngle={connectionPaths[connection.id]?.arrowAngle}
-                    connection={connection}
-                    isSelected={selectedConnectionIds.has(connection.id)}
-                    items={droppedItems}
-                    pathData={connectionPaths[connection.id]?.pathData}
-                    points={pointsToRender}
-                    targetPosition={connectionPaths[connection.id]?.endPoint}
-                    onWaypointDrag={(
-                      index: number,
-                      pos: { x: number; y: number },
-                    ) => {
-                      if (!projectId) return;
+                      if (isCtrl && prev.has(connection.id)) {
+                        next.delete(connection.id);
+                      } else {
+                        next.add(connection.id);
+                      }
 
-                      const base =
-                        savedWaypoints.length > 0
-                          ? [...savedWaypoints]
-                          : [...routerWaypoints];
-
-                      base[index] = pos;
-
-                      editorStore.updateConnection(projectId, connection.id, {
-                        waypoints: base,
-                      });
-                    }}
-                    onSelect={(e: Konva.KonvaEventObject<MouseEvent>) => {
-                      const isCtrl = e.evt.ctrlKey || e.evt.metaKey;
-
-                      setSelectedConnectionIds((prev: Set<number>) => {
-                        const next = new Set(isCtrl ? prev : []);
-
-                        if (isCtrl && prev.has(connection.id)) {
-                          next.delete(connection.id);
-                        } else {
-                          next.add(connection.id);
-                        }
-
-                        return next;
-                      });
-
-                      if (!isCtrl) setSelectedItemIds(new Set());
-                    }}
-                  />
-                );
-              })}
+                      return next;
+                    });
+                    if (!isCtrl) setSelectedItemIds(new Set());
+                  }}
+                />
+              ))}
 
               {/* Render Temporary Connection Line (Drawing) */}
               {isDrawingConnection && tempConnection && (

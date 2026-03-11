@@ -49,6 +49,8 @@ class OverlayContainer(QWidget):
         layout.setContentsMargins(0, 0, 20, 20)
 
 
+
+
 class ImageSubWindow(QMdiSubWindow):
     def __init__(self, image_path, parent=None):
         super().__init__(parent)
