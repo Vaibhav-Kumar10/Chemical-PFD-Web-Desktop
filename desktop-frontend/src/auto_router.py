@@ -75,7 +75,8 @@ class AutoRouter:
     DEFAULT_GRID_RESOLUTION = 10
     
     # Padding around components to avoid collision (in grid units)
-    COMPONENT_PADDING = 1  # Reduced to allow tighter routing
+    # Increased to prevent lines from touching or overlapping components
+    COMPONENT_PADDING = 3  # Provides ~30px clearance for better visual separation
     
     # Padding around existing connections (in grid units)
     CONNECTION_PADDING = 1
