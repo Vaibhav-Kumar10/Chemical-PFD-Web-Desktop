@@ -78,26 +78,30 @@ class ComponentWidget(QWidget):
     def calculate_svg_rect(self, content_rect):
         """
         Calculate the actual rectangle where SVG will be rendered.
-        Updated to preserve aspect ratio instead of stretching.
+        Preserves source SVG aspect ratio to avoid component stretching.
         """
         default_size = self.renderer.defaultSize()
-        svg_w = default_size.width()
-        svg_h = default_size.height()
-        
-        if svg_w <= 0 or svg_h <= 0:
+        if not default_size or default_size.width() <= 0 or default_size.height() <= 0:
             return QRectF(content_rect)
-            
-        scale_w = content_rect.width() / svg_w
-        scale_h = content_rect.height() / svg_h
-        scale = min(scale_w, scale_h)
-        
-        new_w = svg_w * scale
-        new_h = svg_h * scale
-        
-        x = content_rect.x() + (content_rect.width() - new_w) / 2.0
-        y = content_rect.y() + (content_rect.height() - new_h) / 2.0
-        
-        return QRectF(x, y, new_w, new_h)
+
+        src_w = float(default_size.width())
+        src_h = float(default_size.height())
+        src_ratio = src_w / src_h
+
+        target_w = content_rect.width()
+        target_h = content_rect.height()
+        target_ratio = target_w / target_h if target_h > 0 else src_ratio
+
+        if target_ratio > src_ratio:
+            render_h = target_h
+            render_w = render_h * src_ratio
+        else:
+            render_w = target_w
+            render_h = render_w / src_ratio
+
+        x = content_rect.x() + (target_w - render_w) / 2.0
+        y = content_rect.y() + (target_h - render_h) / 2.0
+        return QRectF(x, y, render_w, render_h)
     
     def map_svg_to_widget_coords(self, svg_x_percent, svg_y_percent, svg_rect):
         """
@@ -357,24 +361,29 @@ class ComponentWidget(QWidget):
     def get_logical_grip_position(self, idx):
         """
         Get grip position in LOGICAL coordinates (unscaled).
-        
-        Matches web formula exactly:
-          cx = (grip.x / 100) * width
-          cy = ((100 - grip.y) / 100) * height
-        
-        No margins, no offsets — direct percentage of logical size.
+
+        Must match the same SVG render rect logic used by paintEvent,
+        otherwise connection endpoints and visible cyan grips diverge.
         """
         grips = self.get_grips()
 
         if 0 <= idx < len(grips):
             grip = grips[idx]
-            l_w = self.logical_rect.width()
-            l_h = self.logical_rect.height()
-            
-            cx = (grip["x"] / 100.0) * l_w
-            cy = ((100.0 - grip["y"]) / 100.0) * l_h
-            
-            return QPointF(cx, cy)
+
+            # Recreate the same geometry used for visual rendering, but in logical space.
+            logical_pad = float(self.PORT_PAD)
+            logical_content = QRectF(
+                logical_pad,
+                logical_pad,
+                max(1.0, self.logical_rect.width()),
+                max(1.0, self.logical_rect.height()),
+            )
+
+            logical_svg_rect = self.calculate_svg_rect(logical_content)
+            mapped = self.map_svg_to_widget_coords(grip["x"], grip["y"], logical_svg_rect)
+
+            # Convert from widget-relative (includes pad) to logical-rect-relative.
+            return QPointF(mapped.x() - logical_pad, mapped.y() - logical_pad)
 
         return QPointF(0, 0)
 
