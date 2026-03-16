@@ -24,22 +24,20 @@ import {
   TbLayoutSidebarRightCollapse,
   TbLayoutSidebarRightExpand,
 } from "react-icons/tb";
-import { Layer, Line, Shape, Stage } from "react-konva";
+import { Layer, Shape, Stage } from "react-konva";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { CanvasItemImage } from "@/components/Canvas/CanvasItemImage";
-import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
-import { ConnectionPreview } from "@/components/Canvas/ConnectionPreview";
 import {
   CanvasPropertiesSidebar,
   ComponentLibrarySidebar,
 } from "@/components/Canvas/ComponentLibrarySidebar";
-import { calculateManualPathsWithBridges, smartRoute, getGripPosition, getStandoff } from "@/utils/routing";
-import { useComponents } from "@/context/ComponentContext";
+import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
+import { ConnectionPreview } from "@/components/Canvas/ConnectionPreview";
 import ExportModal from "@/components/Canvas/ExportModal";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { useComponents } from "@/context/ComponentContext";
-import { calculateManualPathsWithBridges } from "@/utils/routing";
+import { calculateManualPathsWithBridges, getGripPosition, getStandoff, smartRoute } from "@/utils/routing";
 // import { exportDiagram, downloadBlob } from "@/utils/exports";
 import { ExportReportModal } from "@/components/Canvas/ExportReportModal";
 import { ExportOptions, type CanvasItem, type ComponentItem, type Connection } from "@/components/Canvas/types";
