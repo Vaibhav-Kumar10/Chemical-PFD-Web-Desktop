@@ -1,28 +1,21 @@
 // Editor.tsx (integrated version)
-import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Stage, Layer, Shape } from "react-konva";
-import Konva from "konva";
 import {
   Button,
   Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Slider,
   Switch,
   Tooltip,
 } from "@heroui/react";
 import Konva from "konva";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FiDownload } from "react-icons/fi";
-import { MdCenterFocusWeak, MdZoomIn, MdZoomOut } from "react-icons/md";
+
 import {
   TbFileImport,
-  TbGridDots, TbGridPattern,
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
   TbLayoutSidebarRightCollapse,
@@ -36,19 +29,12 @@ import { TbGridDots, TbGridPattern } from "react-icons/tb";
 import { buildGraph } from "../utils/graph/buildGraph";
 import { validateGraph } from "../utils/graph/validateGraph";
 
-import { ThemeSwitch } from "@/components/theme-switch";
 import { CanvasItemImage } from "@/components/Canvas/CanvasItemImage";
 import {
   CanvasPropertiesSidebar,
   ComponentLibrarySidebar,
 } from "@/components/Canvas/ComponentLibrarySidebar";
-import {
-  calculateManualPathsWithBridges,
-  smartRoute,
-  getGripPosition,
-  getStandoff,
-} from "@/utils/routing";
-import { useComponents } from "@/context/ComponentContext";
+
 import ExportModal from "@/components/Canvas/ExportModal";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { useComponents } from "@/context/ComponentContext";
@@ -79,6 +65,8 @@ import {
   saveProjectCanvas,
 } from "@/api/projectApi";
 import { convertToBackendFormat, SavedProject } from "@/utils/projectStorage";
+import { ConnectionPreview } from "@/components/Canvas/ConnectionPreview";
+import { ConnectionLine } from "@/components/Canvas/ConnectionLine";
 
 type Shortcut = {
   key: string;
