@@ -1,22 +1,21 @@
 // src/utils/pathfinding/optimize.ts
-import { GridPoint, Point } from "./types";
-import { toCanvas } from "./grid";
+import { Point } from "./types";
 
 /**
  * Compress straight line segments in a grid path
  * Removes intermediate points that lie on straight lines
  */
-export function compressPath(gridPath: GridPoint[]): GridPoint[] {
-  if (gridPath.length <= 2) {
-    return gridPath;
+export function compressPath(path: Point[]): Point[] {
+  if (path.length <= 2) {
+    return path;
   }
 
-  const compressed: GridPoint[] = [gridPath[0]];
+  const compressed: Point[] = [path[0]];
 
-  for (let i = 1; i < gridPath.length - 1; i++) {
+  for (let i = 1; i < path.length - 1; i++) {
     const prev = compressed[compressed.length - 1];
-    const current = gridPath[i];
-    const next = gridPath[i + 1];
+    const current = path[i];
+    const next = path[i + 1];
 
     // Check if we need to change direction
     const prevDirX = Math.sign(current.x - prev.x);
@@ -30,17 +29,11 @@ export function compressPath(gridPath: GridPoint[]): GridPoint[] {
     }
   }
 
-  compressed.push(gridPath[gridPath.length - 1]);
+  compressed.push(path[path.length - 1]);
 
   return compressed;
 }
 
-/**
- * Convert grid path to canvas coordinates
- */
-export function gridPathToCanvas(gridPath: GridPoint[]): Point[] {
-  return gridPath.map(toCanvas);
-}
 
 /**
  * Create orthogonal line segments from waypoints
@@ -77,13 +70,10 @@ export function createOrthogonalSegments(points: Point[]): Point[] {
 /**
  * Full path optimization pipeline
  */
-export function optimizePath(gridPath: GridPoint[]): Point[] {
+export function optimizePath(path: Point[]): Point[] {
   // Compress straight segments
-  const compressed = compressPath(gridPath);
+  const compressed = compressPath(path);
 
-  // Convert to canvas coordinates
-  const canvasPath = gridPathToCanvas(compressed);
-
-  // Ensure orthogonal segments
-  return createOrthogonalSegments(canvasPath);
+  // Ensure orthogonal segments for safety
+  return createOrthogonalSegments(compressed);
 }

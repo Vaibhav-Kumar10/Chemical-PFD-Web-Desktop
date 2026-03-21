@@ -1,9 +1,9 @@
 // src/utils/pathfinding/router.ts
 import { Point } from "./types";
-import { aStar } from "./aStar";
-import { toGrid, buildObstacleGrid, getGridBounds } from "./grid";
-import { getObstacleRects, applyStandoff } from "./obstacles";
+import { aStarSpatial } from "./aStar";
+import { applyStandoff } from "./obstacles";
 import { optimizePath } from "./optimize";
+import { generateSpatialGraph } from "./spatialGraph";
 
 import { CanvasItem } from "@/components/Canvas/types";
 
@@ -27,23 +27,22 @@ export function findOrthogonalPath(
 ): Point[] {
   const { canvasWidth, canvasHeight } = config;
 
-  // Get obstacle rectangles from canvas items
-  const obstacleRects = getObstacleRects(items);
-
-  // Build obstacle grid
-  const obstacleGrid = buildObstacleGrid(
-    obstacleRects,
+  // Generate Spatial Graph nodes
+  const nodes = generateSpatialGraph(
+    items,
+    start,
+    end,
+    [],
+    20, // Padding
     canvasWidth,
-    canvasHeight,
+    canvasHeight
   );
-  const gridBounds = getGridBounds(canvasWidth, canvasHeight);
 
-  // Convert start and end points to grid coordinates
-  const startGrid = toGrid(start);
-  const endGrid = toGrid(end);
+  const startId = `${start.x},${start.y}`;
+  const endId = `${end.x},${end.y}`;
 
-  // Run A* pathfinding
-  const result = aStar(startGrid, endGrid, obstacleGrid, gridBounds);
+  // Run Spatial A* pathfinding
+  const result = aStarSpatial(startId, endId, nodes);
 
   if (!result.found || result.path.length === 0) {
     // Fallback: create simple orthogonal path
@@ -51,6 +50,7 @@ export function findOrthogonalPath(
   }
 
   // Optimize and convert path to canvas coordinates
+  // optimizePath removes unnecessary collinear intermediate points
   return optimizePath(result.path);
 }
 

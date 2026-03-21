@@ -31,6 +31,15 @@ export function getObstacleRects(items: CanvasItem[]): Rect[] {
   });
 }
 
+export function getPaddedObstacleRects(items: CanvasItem[], padding: number = 20): Rect[] {
+  return getObstacleRects(items).map(rect => ({
+    x: rect.x - padding,
+    y: rect.y - padding,
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
+  }));
+}
+
 /**
  * Check if a line segment intersects with any obstacle
  */

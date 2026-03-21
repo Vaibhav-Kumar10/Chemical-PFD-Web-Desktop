@@ -243,6 +243,7 @@ export interface PathMetadata {
   endPoint?: Point;
   arrowAngle?: number;
   waypoints?: Point[];
+  segments?: import("./pathfinding/types").LineSegment[];
 }
 
 export const STANDOFF_DIST = 20;
@@ -310,51 +311,20 @@ export const calculateManualPathsWithBridges = (
 
     let bends: Point[];
 
-    if (conn.waypoints && conn.waypoints.length > 0) {
-      const waypoint = conn.waypoints[0];
-
-      if (useAStar) {
-        const first = smartRouteAStar(
-          startStandoff,
-          waypoint,
-          items,
-          canvasWidth,
-          canvasHeight,
-          sourceGrip,
-          null,
-        );
-        const second = smartRouteAStar(
-          waypoint,
-          endStandoff,
-          items,
-          canvasWidth,
-          canvasHeight,
-          null,
-          targetGrip,
-        );
-
-        bends = [...first.slice(1, -1), waypoint, ...second.slice(1, -1)]; // Remove duplicate start/end points
-      } else {
-        const first = smartRoute(startStandoff, waypoint, items);
-        const second = smartRoute(waypoint, endStandoff, items);
-
-        bends = [...first, waypoint, ...second];
-      }
+    if (useAStar) {
+      bends = smartRouteAStar(
+        startStandoff,
+        endStandoff,
+        items,
+        canvasWidth,
+        canvasHeight,
+        undefined, // Avoid double standoff (startStandoff already passed)
+        undefined,
+        conn.waypoints && conn.waypoints.length > 0 ? conn.waypoints : undefined
+      );
+      bends = bends.slice(1, -1); // Remove standoff points from result
     } else {
-      if (useAStar) {
-        bends = smartRouteAStar(
-          startStandoff,
-          endStandoff,
-          items,
-          canvasWidth,
-          canvasHeight,
-          sourceGrip,
-          targetGrip,
-        );
-        bends = bends.slice(1, -1); // Remove standoff points from result since we add them separately
-      } else {
-        bends = smartRoute(startStandoff, endStandoff, items);
-      }
+      bends = smartRoute(startStandoff, endStandoff, items);
     }
 
     connectionWaypoints[conn.id] = bends;
@@ -479,11 +449,20 @@ export const calculateManualPathsWithBridges = (
         Math.atan2(lastSeg.dir.y, lastSeg.dir.x) * (180 / Math.PI) + 90;
     }
 
+    const exportedSegments: import("./pathfinding/types").LineSegment[] = line.segments.map(seg => ({
+      p1: seg.p1,
+      p2: seg.p2,
+      len: seg.len,
+      lineId: seg.lineId,
+      type: Math.abs(seg.dir.x) > Math.abs(seg.dir.y) ? 'horizontal' : 'vertical'
+    }));
+
     finalPaths[line.id] = {
       pathData,
       endPoint,
       arrowAngle,
       waypoints: connectionWaypoints[line.id],
+      segments: exportedSegments,
     };
   }
 

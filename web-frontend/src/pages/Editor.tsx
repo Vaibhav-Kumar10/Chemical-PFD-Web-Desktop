@@ -1927,9 +1927,6 @@ export default function Editor() {
               {connections.map((connection: Connection) => {
                 const savedWaypoints = connection.waypoints || [];
 
-                // Only show draggable handles for explicit user waypoints
-                const pointsToRender = savedWaypoints;
-
                 return (
                   <ConnectionLine
                     key={connection.id}
@@ -1937,8 +1934,38 @@ export default function Editor() {
                     isSelected={selectedConnectionIds.has(connection.id)}
                     items={droppedItems}
                     pathData={connectionPaths[connection.id]?.pathData}
-                    points={pointsToRender}
+                    segments={connectionPaths[connection.id]?.segments}
                     targetPosition={connectionPaths[connection.id]?.endPoint}
+                    onSegmentDragEnd={(segment: any, dx: number, dy: number) => {
+                      if (!projectId) return;
+                      let baseWaypoints = connection.waypoints || [];
+                      
+                      const pathMeta = connectionPaths[connection.id];
+                      if (baseWaypoints.length === 0 && pathMeta?.waypoints) {
+                          baseWaypoints = [...pathMeta.waypoints];
+                      }
+
+                      let modified = false;
+                      const nextWaypoints = baseWaypoints.map((wp: any) => {
+                          const isP1 = Math.abs(wp.x - segment.p1.x) < 2 && Math.abs(wp.y - segment.p1.y) < 2;
+                          const isP2 = Math.abs(wp.x - segment.p2.x) < 2 && Math.abs(wp.y - segment.p2.y) < 2;
+                          
+                          if (isP1 || isP2) {
+                              modified = true;
+                              return {
+                                  x: wp.x + dx,
+                                  y: wp.y + dy
+                              };
+                          }
+                          return wp;
+                      });
+
+                      if (modified) {
+                          editorStore.updateConnection(projectId, connection.id, {
+                              waypoints: nextWaypoints
+                          });
+                      }
+                    }}
                     onSelect={(e: Konva.KonvaEventObject<MouseEvent>) => {
                       const isCtrl = e.evt.ctrlKey || e.evt.metaKey;
 
@@ -1976,20 +2003,6 @@ export default function Editor() {
                           );
                         }
                       }
-                    }}
-                    onWaypointDrag={(
-                      index: number,
-                      pos: { x: number; y: number },
-                    ) => {
-                      if (!projectId || savedWaypoints.length === 0) return;
-
-                      const base = [...savedWaypoints];
-
-                      base[index] = pos;
-
-                      editorStore.updateConnection(projectId, connection.id, {
-                        waypoints: base,
-                      });
                     }}
                   />
                 );

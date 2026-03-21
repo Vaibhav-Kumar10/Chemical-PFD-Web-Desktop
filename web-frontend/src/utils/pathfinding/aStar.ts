@@ -1,9 +1,15 @@
 // src/utils/pathfinding/aStar.ts
-import { GridPoint, PathResult, AStarNode } from "./types";
+import { Point, SpatialNode } from "./types";
 
-/**
- * Priority queue implementation for A* algorithm
- */
+export interface SpatialAStarNode {
+  nodeId: string;
+  g: number;
+  h: number;
+  f: number;
+  parent: SpatialAStarNode | null;
+  direction: 'horizontal' | 'vertical' | null;
+}
+
 class PriorityQueue<T> {
   private items: { item: T; priority: number }[] = [];
 
@@ -31,135 +37,90 @@ class PriorityQueue<T> {
   }
 }
 
-/**
- * Manhattan distance heuristic for orthogonal movement
- */
-function heuristic(a: GridPoint, b: GridPoint): number {
+function heuristic(a: SpatialNode, b: SpatialNode): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-/**
- * Get neighboring grid points (4-directional orthogonal movement)
- */
-function getNeighbors(
-  point: GridPoint,
-  grid: boolean[][],
-  bounds: { width: number; height: number },
-): GridPoint[] {
-  const neighbors: GridPoint[] = [];
-  const directions = [
-    { x: 1, y: 0 }, // Right
-    { x: -1, y: 0 }, // Left
-    { x: 0, y: 1 }, // Down
-    { x: 0, y: -1 }, // Up
-  ];
+export function aStarSpatial(
+  startId: string,
+  goalId: string,
+  nodes: Map<string, SpatialNode>,
+): { path: Point[]; found: boolean } {
+  const startNodeData = nodes.get(startId);
+  const goalNodeData = nodes.get(goalId);
 
-  for (const dir of directions) {
-    const nx = point.x + dir.x;
-    const ny = point.y + dir.y;
+  if (!startNodeData || !goalNodeData) return { path: [], found: false };
 
-    // Check bounds
-    if (nx >= 0 && nx < bounds.width && ny >= 0 && ny < bounds.height) {
-      // Check if cell is not blocked
-      if (!grid[ny][nx]) {
-        neighbors.push({ x: nx, y: ny });
-      }
-    }
-  }
+  const openSet = new PriorityQueue<SpatialAStarNode>();
+  
+  // We need to track closed set by nodeId AND incoming direction to allow 
+  // revisiting a node if we approach it from a better direction (e.g. fewer bends).
+  // However, simpler standard A* over graphs typically just records the best G per state.
+  // State = nodeId + direction.
+  const bestG = new Map<string, number>();
 
-  return neighbors;
-}
-
-/**
- * Check if two grid points are equal
- */
-function pointsEqual(a: GridPoint, b: GridPoint): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
-/**
- * A* pathfinding algorithm for orthogonal movement
- */
-export function aStar(
-  start: GridPoint,
-  goal: GridPoint,
-  grid: boolean[][],
-  bounds: { width: number; height: number },
-): PathResult {
-  const openSet = new PriorityQueue<AStarNode>();
-  const closedSet = new Set<string>();
-
-  // Key function for tracking visited nodes
-  const key = (point: GridPoint) => `${point.x},${point.y}`;
-
-  // Initialize start node
-  const startNode: AStarNode = {
-    point: start,
+  const startState: SpatialAStarNode = {
+    nodeId: startId,
     g: 0,
-    h: heuristic(start, goal),
-    f: heuristic(start, goal),
+    h: heuristic(startNodeData, goalNodeData),
+    f: heuristic(startNodeData, goalNodeData),
     parent: null,
+    direction: null,
   };
 
-  openSet.enqueue(startNode, startNode.f);
+  openSet.enqueue(startState, startState.f);
+  bestG.set(`${startId}-null`, 0);
+
+  const DIRECTION_PENALTY = 500; // Heavy penalty for changing direction (L/Z-shapes)
 
   while (!openSet.isEmpty()) {
     const current = openSet.dequeue()!;
 
-    // Check if we reached the goal
-    if (pointsEqual(current.point, goal)) {
-      // Reconstruct path
-      const path: GridPoint[] = [];
-      let node: AStarNode | null = current;
-
-      while (node) {
-        path.unshift(node.point);
-        node = node.parent;
+    if (current.nodeId === goalId) {
+      // Reconstruct Path
+      const path: Point[] = [];
+      let c: SpatialAStarNode | null = current;
+      while (c) {
+        const p = nodes.get(c.nodeId);
+        if (p) path.unshift({ x: p.x, y: p.y });
+        c = c.parent;
       }
-
       return { path, found: true };
     }
 
-    const currentKey = key(current.point);
+    const currentGraphNode = nodes.get(current.nodeId)!;
 
-    if (closedSet.has(currentKey)) {
-      continue;
-    }
-    closedSet.add(currentKey);
+    for (const neighbor of currentGraphNode.neighbors) {
+      const neighborGraphNode = nodes.get(neighbor.nodeId);
+      if (!neighborGraphNode) continue;
 
-    // Explore neighbors
-    const neighbors = getNeighbors(current.point, grid, bounds);
-
-    for (const neighbor of neighbors) {
-      const neighborKey = key(neighbor);
-
-      if (closedSet.has(neighborKey)) {
-        continue;
+      let penalty = 0;
+      // If we are changing direction, add penalty
+      if (current.direction !== null && current.direction !== neighbor.direction) {
+        penalty = DIRECTION_PENALTY;
       }
 
-      const g = current.g + 1; // Orthogonal movement cost = 1
-      const h = heuristic(neighbor, goal);
-      const f = g + h;
+      const tentativeG = current.g + neighbor.distance + penalty;
+      const stateKey = `${neighbor.nodeId}-${neighbor.direction}`;
 
-      const neighborNode: AStarNode = {
-        point: neighbor,
-        g,
-        h,
-        f,
-        parent: current,
-      };
-
-      // Check if this neighbor is already in open set with better cost
-      const existingNode = openSet.find((node) =>
-        pointsEqual(node.point, neighbor),
-      );
-
-      if (!existingNode || g < existingNode.g) {
-        openSet.enqueue(neighborNode, f);
+      if (!bestG.has(stateKey) || tentativeG < bestG.get(stateKey)!) {
+        bestG.set(stateKey, tentativeG);
+        
+        const h = heuristic(neighborGraphNode, goalNodeData);
+        
+        const nextState: SpatialAStarNode = {
+          nodeId: neighbor.nodeId,
+          g: tentativeG,
+          h: h,
+          f: tentativeG + h,
+          parent: current,
+          direction: neighbor.direction
+        };
+        
+        openSet.enqueue(nextState, nextState.f);
       }
     }
   }
 
-  // No path found
   return { path: [], found: false };
 }

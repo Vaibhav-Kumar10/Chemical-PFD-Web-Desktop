@@ -28,3 +28,22 @@ export interface AStarNode {
   f: number; // Total cost (g + h)
   parent: AStarNode | null;
 }
+
+export interface SpatialNode {
+  id: string;
+  x: number;
+  y: number;
+  neighbors: {
+    nodeId: string;
+    distance: number;
+    direction: 'horizontal' | 'vertical';
+  }[];
+}
+
+export interface LineSegment {
+  p1: Point;
+  p2: Point;
+  type: 'horizontal' | 'vertical';
+  len: number;
+  lineId?: number;
+}
