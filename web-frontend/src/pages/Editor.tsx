@@ -34,6 +34,16 @@ import {
   CanvasPropertiesSidebar,
   ComponentLibrarySidebar,
 } from "@/components/Canvas/ComponentLibrarySidebar";
+import {
+  calculateManualPathsWithBridges,
+  smartRoute,
+  getGripPosition,
+  getStandoff,
+} from "@/utils/routing";
+import { moveSegment, findSegmentIndex, snap } from "@/utils/pathfinding/segmentDrag";
+import { optimizePath, enforceManhattanShape } from "@/utils/pathfinding/optimize";
+import { getPaddedObstacleRects, pathHitsObstacle } from "@/utils/pathfinding/obstacles";
+import { useComponents } from "@/context/ComponentContext";
 
 import ExportModal from "@/components/Canvas/ExportModal";
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -1930,33 +1940,64 @@ export default function Editor() {
                     targetPosition={connectionPaths[connection.id]?.endPoint}
                     onSegmentDragEnd={(segment: any, dx: number, dy: number) => {
                       if (!projectId) return;
-                      let baseWaypoints = connection.waypoints || [];
-                      
+
+                      // Phase 4: jitter guard — ignore micro drags
+                      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+
                       const pathMeta = connectionPaths[connection.id];
-                      if (baseWaypoints.length === 0 && pathMeta?.waypoints) {
-                          baseWaypoints = [...pathMeta.waypoints];
+
+                      // Resolve the current path from stored waypoints
+                      // pathMeta.waypoints contains all bend points between standoff ends
+                      const currentPath: { x: number; y: number }[] =
+                        (pathMeta?.waypoints && pathMeta.waypoints.length > 0)
+                          ? pathMeta.waypoints
+                          : (connection.waypoints || []);
+
+                      if (currentPath.length === 0) return;
+
+                      // Find which segment index in the path corresponds to the dragged segment
+                      const segIdx = findSegmentIndex(
+                        currentPath,
+                        segment.p1,
+                        segment.p2,
+                        8, // tolerance in pixels
+                      );
+
+                      if (segIdx === -1) {
+                        // Fallback: shift all waypoints by drag delta (old behaviour)
+                        const shifted = currentPath.map((wp) => ({
+                          x: snap(wp.x + dx),
+                          y: snap(wp.y + dy),
+                        }));
+                        editorStore.updateConnection(projectId, connection.id, {
+                          waypoints: shifted,
+                        });
+                        return;
                       }
 
-                      let modified = false;
-                      const nextWaypoints = baseWaypoints.map((wp: any) => {
-                          const isP1 = Math.abs(wp.x - segment.p1.x) < 2 && Math.abs(wp.y - segment.p1.y) < 2;
-                          const isP2 = Math.abs(wp.x - segment.p2.x) < 2 && Math.abs(wp.y - segment.p2.y) < 2;
-                          
-                          if (isP1 || isP2) {
-                              modified = true;
-                              return {
-                                  x: wp.x + dx,
-                                  y: wp.y + dy
-                              };
-                          }
-                          return wp;
+                      // Phase 3: move the segment within the path
+                      const moved = moveSegment(currentPath, segIdx, dx, dy);
+
+                      // Phase 4: snap all points to grid
+                      const snapped = moved.map((p) => ({
+                        x: snap(p.x),
+                        y: snap(p.y),
+                      }));
+
+                      // Get padded obstacles for drag check
+                      const obstacles = getPaddedObstacleRects(droppedItems, 20);
+
+                      // Post-process: re-optimize and enforce clean shape
+                      const clean = enforceManhattanShape(optimizePath(snapped), obstacles);
+
+                      // Phase 6: Add rejection logic
+                      if (pathHitsObstacle(clean, obstacles)) {
+                        return; // revert by doing nothing
+                      }
+
+                      editorStore.updateConnection(projectId, connection.id, {
+                        waypoints: clean,
                       });
-
-                      if (modified) {
-                          editorStore.updateConnection(projectId, connection.id, {
-                              waypoints: nextWaypoints
-                          });
-                      }
                     }}
                     onSelect={(e: Konva.KonvaEventObject<MouseEvent>) => {
                       const isCtrl = e.evt.ctrlKey || e.evt.metaKey;
