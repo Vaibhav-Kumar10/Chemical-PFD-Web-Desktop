@@ -34,16 +34,9 @@ import {
   CanvasPropertiesSidebar,
   ComponentLibrarySidebar,
 } from "@/components/Canvas/ComponentLibrarySidebar";
-import {
-  calculateManualPathsWithBridges,
-  smartRoute,
-  getGripPosition,
-  getStandoff,
-} from "@/utils/routing";
 import { moveSegment, findSegmentIndex, snap } from "@/utils/pathfinding/segmentDrag";
 import { optimizePath, enforceManhattanShape } from "@/utils/pathfinding/optimize";
 import { getPaddedObstacleRects, pathHitsObstacle } from "@/utils/pathfinding/obstacles";
-import { useComponents } from "@/context/ComponentContext";
 
 import ExportModal from "@/components/Canvas/ExportModal";
 import { ThemeSwitch } from "@/components/theme-switch";
